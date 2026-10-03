@@ -15,6 +15,7 @@ interface HeaderProps {
   setActiveWorkspace: (ws: MainWorkspace) => void;
   onOpenUpload: () => void;
   onToggleCopilot: () => void;
+  onGoToLanding?: () => void;
   systemStatus: string;
   hasOpenThreats: boolean;
   pendingPRsCount: number;
@@ -25,6 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveWorkspace,
   onOpenUpload,
   onToggleCopilot,
+  onGoToLanding,
   systemStatus,
   hasOpenThreats,
   pendingPRsCount,
@@ -34,12 +36,16 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="h-14 flex items-center justify-between gap-4">
           {/* Brand */}
-          <div className="flex items-center space-x-3 shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-white">
+          <div
+            onClick={onGoToLanding}
+            className="flex items-center space-x-3 shrink-0 cursor-pointer group"
+            title="Return to Landing Page & Story"
+          >
+            <div className="w-8 h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-white group-hover:border-neutral-700 transition-colors">
               <Shield className="w-4 h-4 text-white" />
             </div>
             <div className="flex items-center space-x-2">
-              <span className="font-bold text-sm tracking-tight text-white">GuardianOS</span>
+              <span className="font-bold text-sm tracking-tight text-white group-hover:text-neutral-200 transition-colors">GuardianOS</span>
               <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-neutral-900 text-neutral-400 border border-neutral-800">
                 v2.0
               </span>

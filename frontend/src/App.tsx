@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Header, MainWorkspace } from './components/Header';
+import { LandingPage } from './components/LandingPage';
 import { ThreatCenterView } from './components/ThreatCenterView';
 import { SupplyChainView } from './components/SupplyChainView';
 import { RemediationCenter } from './components/RemediationCenter';
@@ -33,6 +34,7 @@ import {
 } from './api';
 
 export const App: React.FC = () => {
+  const [isLanding, setIsLanding] = useState<boolean>(true);
   const [activeWorkspace, setActiveWorkspace] = useState<MainWorkspace>('threats');
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
@@ -130,14 +132,29 @@ export const App: React.FC = () => {
   const hasOpenThreats = attackPaths.some((p) => p.status === 'OPEN');
   const pendingPRsCount = remediationTasks.filter((t) => t.status === 'PENDING_APPROVAL').length;
 
+  // Render Public Landing Page
+  if (isLanding) {
+    return (
+      <LandingPage
+        onEnterApp={() => setIsLanding(false)}
+        onRunDemoAndEnter={async () => {
+          setIsLanding(false);
+          await handleRunDemo();
+        }}
+      />
+    );
+  }
+
+  // Render Enterprise Control Plane
   return (
     <div className="min-h-screen bg-black text-neutral-200 flex flex-col font-sans selection:bg-neutral-800 selection:text-white">
-      {/* 1. Header with 3 Unified Workspaces */}
+      {/* 1. Header with 3 Unified Workspaces & Return to Story trigger */}
       <Header
         activeWorkspace={activeWorkspace}
         setActiveWorkspace={setActiveWorkspace}
         onOpenUpload={() => setIsUploadOpen(true)}
         onToggleCopilot={() => setIsCopilotOpen((prev) => !prev)}
+        onGoToLanding={() => setIsLanding(true)}
         systemStatus={systemStatus}
         hasOpenThreats={hasOpenThreats}
         pendingPRsCount={pendingPRsCount}
