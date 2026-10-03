@@ -10,6 +10,7 @@ from guardianos.api.v1.graph import router as graph_router
 from guardianos.api.v1.audit import router as audit_router
 from guardianos.api.v1.vulnerabilities import router as vulnerabilities_router
 from guardianos.api.v1.upstream_changes import router as upstream_changes_router
+from guardianos.api.v1.patches import router as patches_router
 
 
 def create_app() -> FastAPI:
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
     app.include_router(audit_router, prefix=settings.API_V1_PREFIX)
     app.include_router(vulnerabilities_router, prefix=settings.API_V1_PREFIX)
     app.include_router(upstream_changes_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(patches_router, prefix=settings.API_V1_PREFIX)
 
     return app
 
