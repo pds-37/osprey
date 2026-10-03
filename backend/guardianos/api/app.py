@@ -15,6 +15,7 @@ from guardianos.api.v1.exposure import router as exposure_router
 from guardianos.api.v1.attack_paths import router as attack_paths_router
 from guardianos.api.v1.risks import router as risks_router
 from guardianos.api.v1.ai import router as ai_router
+from guardianos.api.v1.remediation import router as remediation_router
 
 
 def create_app() -> FastAPI:
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
     app.include_router(attack_paths_router, prefix=settings.API_V1_PREFIX)
     app.include_router(risks_router, prefix=settings.API_V1_PREFIX)
     app.include_router(ai_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(remediation_router, prefix=settings.API_V1_PREFIX)
 
     return app
 
