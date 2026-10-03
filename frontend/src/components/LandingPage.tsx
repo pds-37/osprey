@@ -35,7 +35,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <Shield className="w-4 h-4 text-white" />
             </div>
             <div className="flex items-center space-x-2">
-              <span className="font-bold text-sm tracking-tight text-white">GuardianOS</span>
+              <span className="font-bold text-sm tracking-tight text-white">Osprey</span>
               <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-neutral-900 text-neutral-400 border border-neutral-800">
                 v2.0
               </span>
@@ -66,9 +66,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <main className="flex-1">
         <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16 text-center space-y-6">
           {/* Badge */}
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-neutral-950 border border-neutral-850 text-neutral-300 text-[11px] font-mono mb-2">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-            <span>Inspired by the ChatGPT .HEIC Parser RCE Incident</span>
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-neutral-950 border border-neutral-800 text-neutral-300 text-[11px] font-mono mb-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>Open-Source Project Extension · Live Workspace Scanner</span>
           </div>
 
           {/* Main Title */}
@@ -81,8 +81,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           {/* Subtitle */}
           <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-            Modern applications don’t just run your code. They run thousands of transitive OS packages 4 layers deep.
-            GuardianOS is the AI-native security control plane that correlates software supply chains with runtime ingress,
+            Modern applications don’t just run your code. They run thousands of transitive packages 4 layers deep.
+            Osprey is the open-source security control plane that correlates software supply chains with runtime ingress,
             cloud identities, and deterministic adversary attack paths.
           </p>
 
@@ -101,7 +101,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-semibold bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-800 transition-all flex items-center justify-center space-x-2 font-mono"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
-              <span>Simulate Live .HEIC Attack & Fix</span>
+              <span>Scan Live Codebase & Trace Paths</span>
             </button>
           </div>
         </section>
@@ -189,7 +189,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <span>STEP 06 · RESOLVE</span>
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                 </div>
-                <h3 className="text-xs font-semibold text-white">GuardianOS Closes Path</h3>
+                <h3 className="text-xs font-semibold text-white">Osprey Closes Path</h3>
                 <p className="text-[11px] text-neutral-400 leading-relaxed">
                   Proposes non-destructive Dockerfile PR, requires human gate, rescans production: <strong className="text-emerald-400">Attack Path CLOSED</strong>.
                 </p>
@@ -203,7 +203,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="text-center space-y-2 max-w-2xl mx-auto">
             <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest">Architecture</span>
             <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-              Why GuardianOS is Not Just Another CVE Dashboard
+              Why Osprey is Not Just Another CVE Dashboard
             </h2>
           </div>
 
@@ -309,9 +309,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
             {/* Bottom CTA Banner */}
             <div className="p-6 rounded-2xl bg-neutral-950 border border-neutral-900 text-center space-y-3">
-              <h3 className="text-base font-bold text-white">Experience GuardianOS v2 Now</h3>
+              <h3 className="text-base font-bold text-white">Get Started with Osprey</h3>
               <p className="text-xs text-neutral-400 max-w-lg mx-auto">
-                Explore the interactive control plane, upload custom CycloneDX/SPDX SBOMs, or simulate the live .HEIC exploit traversal.
+                Trace transitive dependencies, query live OSV advisories, and analyze complete attack paths in seconds.
               </p>
               <button
                 onClick={onEnterApp}
@@ -328,7 +328,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Minimal Footer */}
       <footer className="border-t border-neutral-900 py-6 text-center text-xs text-neutral-500 font-mono">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>GuardianOS v2.0 — AI-Native Supply Chain & Attack Path Control Plane</span>
+          <span>Osprey v2.0 — Open-Source Supply Chain & Attack Path Control Plane</span>
           <div className="flex items-center space-x-4">
             <button onClick={onEnterApp} className="hover:text-neutral-300 transition-colors">
               App

@@ -70,6 +70,31 @@ async def list_sboms():
     return inventory_service.list_sboms()
 
 
+class ScanWorkspaceRequest(BaseModel):
+    path: Optional[str] = Field(None, description="Path to scan (defaults to project workspace)")
+    app_name: Optional[str] = Field(None, description="Optional application name")
+    environment: str = Field("production", description="Target environment")
+
+
+@router.post("/scan-local-manifests", response_model=IngestionResult, status_code=status.HTTP_201_CREATED)
+async def scan_local_workspace(payload: Optional[ScanWorkspaceRequest] = None):
+    """Scan real package manifests (package.json, requirements.txt, Dockerfile, etc.) directly from any target folder."""
+    import os
+    from guardianos.inventory.scanner import scan_directory_manifests
+    
+    target_path = payload.path if (payload and payload.path) else os.getcwd()
+    app_name = payload.app_name if (payload and payload.app_name) else None
+    env = payload.environment if (payload and payload.environment) else "production"
+
+    result, manifests = scan_directory_manifests(
+        target_dir=target_path,
+        app_name=app_name,
+        environment=env
+    )
+    result.summary["manifests"] = manifests
+    return result
+
+
 @router.get("/{sbom_id}", response_model=SBOMDocument)
 async def get_sbom(sbom_id: str):
     """Get single SBOM document metadata."""

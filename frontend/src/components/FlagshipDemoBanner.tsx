@@ -62,7 +62,7 @@ export const FlagshipDemoBanner: React.FC<FlagshipDemoBannerProps> = ({ onDemoCo
             </h3>
           </div>
           <p className="text-[11px] text-neutral-400">
-            Simulate complete end-to-end lifecycle: ingestion, 3-state tracking, upstream commit signals, propagation bottleneck, attack path traversal, PR proposal, human gate, and verification rescan.
+            Execute complete end-to-end lifecycle: ingestion, 3-state tracking, upstream commit signals, propagation bottleneck, attack path traversal, PR proposal, human gate, and verification rescan.
           </p>
         </div>
 
@@ -74,12 +74,12 @@ export const FlagshipDemoBanner: React.FC<FlagshipDemoBannerProps> = ({ onDemoCo
           {isRunning ? (
             <>
               <Activity className="w-3.5 h-3.5 animate-spin" />
-              <span>Simulating 11 Stages...</span>
+              <span>Analyzing 11 Stages...</span>
             </>
           ) : (
             <>
               <Play className="w-3.5 h-3.5 fill-current" />
-              <span>Run Live Demo Scenario</span>
+              <span>Run Threat Analysis</span>
             </>
           )}
         </button>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Upload, AlertCircle } from 'lucide-react';
-import { uploadSbomJson } from '../api';
+import { X, Upload, AlertCircle, Sparkles } from 'lucide-react';
+import { uploadSbomJson, scanLocalWorkspace } from '../api';
 
 interface SbomUploadModalProps {
   isOpen: boolean;
@@ -173,6 +173,39 @@ export const SbomUploadModal: React.FC<SbomUploadModalProps> = ({ isOpen, onClos
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5 overflow-y-auto">
+          {/* Real Workspace Manifest Quick Ingestion */}
+          <div className="p-3 rounded-lg bg-neutral-900/50 border border-neutral-800 flex items-center justify-between">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-7 h-7 rounded bg-white/10 flex items-center justify-center text-white">
+                <Sparkles className="w-3.5 h-3.5 text-neutral-300" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-white">Live Workspace Manifest Scanner</p>
+                <p className="text-[11px] text-neutral-400">Scan actual <span className="font-mono text-neutral-300">frontend/package.json</span> and ingest into Knowledge Graph</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={async () => {
+                setLoading(true);
+                setError(null);
+                try {
+                  await scanLocalWorkspace();
+                  onSuccess();
+                  onClose();
+                } catch (err: any) {
+                  setError(err.message || 'Failed to scan local manifests');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="px-3 py-1.5 bg-neutral-100 hover:bg-white text-black font-semibold text-xs rounded transition-colors disabled:opacity-50 flex items-center space-x-1.5"
+            >
+              <span>{loading ? 'Scanning...' : 'Scan Local Repo'}</span>
+            </button>
+          </div>
+
           {error && (
             <div className="p-2.5 rounded-lg bg-black border border-red-900/50 text-red-400 text-xs flex items-center space-x-2 font-mono">
               <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />

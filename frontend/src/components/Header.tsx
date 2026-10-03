@@ -45,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
               <Shield className="w-4 h-4 text-white" />
             </div>
             <div className="flex items-center space-x-2">
-              <span className="font-bold text-sm tracking-tight text-white group-hover:text-neutral-200 transition-colors">GuardianOS</span>
+              <span className="font-bold text-sm tracking-tight text-white group-hover:text-neutral-200 transition-colors">Osprey</span>
               <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-neutral-900 text-neutral-400 border border-neutral-800">
                 v2.0
               </span>

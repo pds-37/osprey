@@ -22,15 +22,28 @@ class IntelService:
 
     def match_component(self, comp: Component) -> List[VulnerabilityFinding]:
         """Check if an individual component is affected by any known vulnerability."""
-        advisories = self.registry.find_by_component(comp.name, comp.ecosystem)
+        advisories = list(self.registry.find_by_component(comp.name, comp.ecosystem))
+        
+        # If not found in local registry, query Google's live OSV.dev database
+        if not advisories:
+            try:
+                from guardianos.intel.osv_client import query_live_osv
+                live_advs = query_live_osv(comp.name, comp.version, comp.ecosystem, timeout=2.5)
+                advisories.extend(live_advs)
+            except Exception:
+                pass
+
         findings = []
 
         for adv in advisories:
-            affected = is_version_affected(
-                installed=comp.version,
-                affected_ranges=adv.affected_version_ranges,
-                fixed_versions=adv.fixed_versions
-            )
+            if adv.source == "OSV.dev":
+                affected = True
+            else:
+                affected = is_version_affected(
+                    installed=comp.version,
+                    affected_ranges=adv.affected_version_ranges,
+                    fixed_versions=adv.fixed_versions
+                )
             if affected:
                 fixed_ver = adv.fixed_versions[0] if adv.fixed_versions else None
                 finding_id = f"find-{comp.name}-{adv.id}-{uuid.uuid4().hex[:6]}"

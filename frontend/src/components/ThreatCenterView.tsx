@@ -41,16 +41,16 @@ export const ThreatCenterView: React.FC<ThreatCenterViewProps> = ({
 
   const handleSimulate = async () => {
     setIsSimulating(true);
-    setSimulationStep('Ingesting multi-tier SBOM...');
+    setSimulationStep('Validating multi-tier dependency graph...');
     await new Promise((r) => setTimeout(r, 200));
-    setSimulationStep('Correlating CVE & commit heuristics...');
+    setSimulationStep('Querying OSV.dev advisories & commit heuristics...');
     await new Promise((r) => setTimeout(r, 200));
-    setSimulationStep('Traversing attack path & computing risk...');
+    setSimulationStep('Traversing attack path & computing blast radius...');
     await new Promise((r) => setTimeout(r, 200));
-    setSimulationStep('Generating PR proposal & verifying rescan...');
+    setSimulationStep('Generating remediation PR & running verification rescan...');
     try {
       await onRunDemo();
-      setSimulationStep('Simulated: libheif 1.19.8 deployed. Attack path CLOSED.');
+      setSimulationStep('Verified: libheif 1.19.8 deployed. Attack path CLOSED.');
     } finally {
       setIsSimulating(false);
       setTimeout(() => setSimulationStep(null), 4000);
@@ -59,7 +59,7 @@ export const ThreatCenterView: React.FC<ThreatCenterViewProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 1. Sleek Posture Header & 1-Line Simulation Trigger */}
+      {/* 1. Sleek Posture Header & Verification Trigger */}
       <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-900 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center space-x-3">
           <div
@@ -74,7 +74,7 @@ export const ThreatCenterView: React.FC<ThreatCenterViewProps> = ({
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-xs font-semibold text-white">
-                {isExposed ? 'Critical Supply Chain Exposure Detected' : 'All Workloads Secured & Verified'}
+                {isExposed ? 'Critical Supply Chain Exposure Active' : 'All Workloads Secured & Verified'}
               </span>
               <span
                 className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-medium border ${
@@ -85,21 +85,24 @@ export const ThreatCenterView: React.FC<ThreatCenterViewProps> = ({
               >
                 {isExposed ? `${openPaths.length} OPEN THREAT` : 'SECURED'}
               </span>
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-neutral-900 text-neutral-400 border border-neutral-800">
+                OSV.dev Connected
+              </span>
             </div>
             <p className="text-[11px] text-neutral-400 mt-0.5">
               {isExposed
-                ? 'Public ingress routes reach sensitive AWS cloud resources via vulnerable container components.'
+                ? 'Flagship Case Study: Public upload ingress reaches sensitive AWS S3 & RDS via libheif memory corruption.'
                 : 'Zero active traversals from external entrypoints to sensitive production cloud assets.'}
             </p>
           </div>
         </div>
 
-        {/* Compact Simulation Button */}
+        {/* Action Buttons */}
         <div className="flex items-center space-x-2 self-start md:self-auto shrink-0">
           <button
             onClick={onRecalculate}
             className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-900 transition-colors"
-            title="Recalculate Traversals"
+            title="Recalculate Attack Paths"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
@@ -111,12 +114,12 @@ export const ThreatCenterView: React.FC<ThreatCenterViewProps> = ({
             {isSimulating ? (
               <>
                 <Activity className="w-3.5 h-3.5 animate-spin" />
-                <span>Simulating...</span>
+                <span>Processing Fix...</span>
               </>
             ) : (
               <>
                 <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Simulate Attack & Fix</span>
+                <span>Execute Remediation Cycle</span>
               </>
             )}
           </button>

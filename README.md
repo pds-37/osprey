@@ -1,10 +1,18 @@
-# GuardianOS v2 — Supply Chain Intelligence & Attack Path Security Platform
+# Osprey — Supply Chain Intelligence & Attack Path Control Plane
 
-> **AI-Native Security Control Plane for Enterprise Software Supply Chains**
+[![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
+[![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-black.svg)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-black.svg)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/Frontend-React%2018-black.svg)](https://react.dev)
+[![Tests: 37 Passed](https://img.shields.io/badge/Tests-37%20Passed-emerald.svg)](tests/)
+[![Intel: OSV.dev Live](https://img.shields.io/badge/Intel-OSV.dev%20Live-blue.svg)](https://osv.dev)
 
-GuardianOS v2 is an advanced Software Supply Chain Intelligence and Attack Path Security Platform. Rather than operating as another superficial CVE vulnerability scanner, GuardianOS v2 correlates software supply-chain intelligence with runtime exposure, cloud identity, agent permissions, and adversary attack paths to answer the question:
+> **Open-Source Workspace Security Extension & Control Plane**
 
-> *"A security-relevant change or vulnerability was discovered in a component that your environment depends on. Are you actually affected, where is the vulnerable component running, can an attacker reach it, what could they access after exploitation, and what should you do?"*
+**Osprey** is an open-source Software Supply Chain Intelligence and Attack Path Security Platform. Instead of operating as another noisy CVE scanner, Osprey allows developers and security teams to pull the tool, scan their project workspace, query Google's live OSV.dev advisory database, and correlate dependencies with runtime ingress, cloud permissions, and adversary attack paths.
+
+Osprey answers the critical question:
+> *"A security-relevant change or vulnerability was discovered in a transitive component that your environment depends on. Are you actually affected, where is it running, can an attacker reach it from public ingress, what could they access after exploitation, and what 1-line PR breaks the kill chain?"*
 
 ---
 
@@ -14,7 +22,7 @@ GuardianOS v2 is an advanced Software Supply Chain Intelligence and Attack Path 
 DETECT ➔ UNDERSTAND ➔ CORRELATE ➔ VERIFY EXPOSURE ➔ BUILD ATTACK PATH ➔ PRIORITIZE RISK ➔ RECOMMEND REMEDIATION ➔ HUMAN APPROVAL ➔ REMEDIATE ➔ VERIFY
 ```
 
-GuardianOS v2 implements the following architectural layers:
+Osprey implements the following architectural layers:
 
 1. **Inventory & SBOM Normalization Engine**: Multi-format ingestion (CycloneDX 1.4/1.5, SPDX 2.2/2.3, Syft) tracking dependencies across three distinct states:
    - **Declared Dependency** (manifest / lockfile)
@@ -41,7 +49,7 @@ GuardianOS v2 implements the following architectural layers:
 
 ### 1. Backend Setup & Test Suite
 ```bash
-# Run the complete test suite (35 unit & integration tests)
+# Run the complete test suite (37 unit & integration tests)
 python run_tests.py
 
 # Start the FastAPI backend server
@@ -60,9 +68,9 @@ The React 18 / Tailwind CSS dashboard will be available at: `http://localhost:51
 
 ---
 
-## 🔬 Flagship End-to-End Demonstration Scenario
+## 🔬 Flagship End-to-End Walkthrough
 
-GuardianOS v2 includes a built-in interactive end-to-end demonstration scenario modeling the real-world **libheif / ImageMagick** vulnerability chain:
+Osprey includes a built-in end-to-end scenario modeling the real-world **libheif / ImageMagick** vulnerability chain:
 
 ```
 Internet (External Adversary)

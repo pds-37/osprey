@@ -66,6 +66,16 @@ export async function uploadSbomJson(payload: {
   return res.json();
 }
 
+export async function scanLocalWorkspace(path?: string, appName?: string): Promise<IngestionResult> {
+  const res = await fetch(`${BASE_URL}/sboms/scan-local-manifests`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, app_name: appName }),
+  });
+  if (!res.ok) throw new Error('Failed to scan workspace manifests');
+  return res.json();
+}
+
 export async function fetchVulnerabilities(): Promise<VulnerabilityFinding[]> {
   const res = await fetch(`${BASE_URL}/vulnerabilities`);
   if (!res.ok) throw new Error('Failed to fetch vulnerabilities');
