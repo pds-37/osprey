@@ -8,6 +8,7 @@ from guardianos.api.v1.sboms import router as sboms_router
 from guardianos.api.v1.components import router as components_router
 from guardianos.api.v1.graph import router as graph_router
 from guardianos.api.v1.audit import router as audit_router
+from guardianos.api.v1.vulnerabilities import router as vulnerabilities_router
 
 
 def create_app() -> FastAPI:
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(components_router, prefix=settings.API_V1_PREFIX)
     app.include_router(graph_router, prefix=settings.API_V1_PREFIX)
     app.include_router(audit_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(vulnerabilities_router, prefix=settings.API_V1_PREFIX)
 
     return app
 
