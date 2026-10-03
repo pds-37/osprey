@@ -137,7 +137,7 @@ export const App: React.FC = () => {
   const pendingApprovalsCount = remediationTasks.filter((t) => t.status === 'PENDING_APPROVAL').length;
 
   return (
-    <div className="min-h-screen bg-[#080c14] text-slate-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen bg-black text-neutral-200 flex flex-col font-sans selection:bg-neutral-800 selection:text-white">
       {/* Top Application Header */}
       <Header
         activeTab={activeTab}
@@ -147,27 +147,27 @@ export const App: React.FC = () => {
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Interactive Flagship Demo Banner */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5">
+        {/* Flagship Demo Banner */}
         <FlagshipDemoBanner onDemoComplete={loadAllData} />
 
-        {/* Real-time Telemetry & KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
+        {/* Minimalist Telemetry & KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5">
           {/* Total Components Card */}
           <div
             onClick={() => setActiveTab('inventory')}
-            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+            className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
               activeTab === 'inventory'
-                ? 'bg-blue-950/40 border-blue-500/50 ring-1 ring-blue-500/30'
-                : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                ? 'bg-neutral-900 border-neutral-700 ring-1 ring-neutral-700'
+                : 'bg-neutral-950 border-neutral-900 hover:border-neutral-800'
             }`}
           >
-            <div className="flex items-center justify-between text-slate-400 mb-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Components</span>
-              <Layers className="w-4 h-4 text-blue-400" />
+            <div className="flex items-center justify-between text-neutral-400 mb-1">
+              <span className="text-[10px] font-mono font-medium uppercase tracking-wider">Components</span>
+              <Layers className="w-3.5 h-3.5 text-neutral-400" />
             </div>
-            <div className="text-2xl font-extrabold text-white font-mono">{totalComponents}</div>
-            <div className="text-[10px] text-slate-400 mt-1 flex items-center space-x-1">
+            <div className="text-xl font-bold text-white font-mono">{totalComponents}</div>
+            <div className="text-[10px] text-neutral-400 mt-0.5 flex items-center space-x-1">
               <span>{runningComponents} Running</span>
               <span>•</span>
               <span>{sboms.length} SBOMs</span>
@@ -177,92 +177,92 @@ export const App: React.FC = () => {
           {/* Adversary Attack Paths Card */}
           <div
             onClick={() => setActiveTab('attack-paths')}
-            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+            className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
               openAttackPathsCount > 0
-                ? 'bg-rose-950/30 border-rose-500/40'
-                : 'bg-slate-900/60 border-slate-800'
-            } ${activeTab === 'attack-paths' ? 'ring-1 ring-rose-500/50' : 'hover:border-slate-700'}`}
+                ? 'bg-neutral-950 border-red-900/60'
+                : 'bg-neutral-950 border-neutral-900'
+            } ${activeTab === 'attack-paths' ? 'ring-1 ring-neutral-600' : 'hover:border-neutral-800'}`}
           >
-            <div className="flex items-center justify-between text-slate-400 mb-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Attack Paths</span>
-              <Route className={`w-4 h-4 ${openAttackPathsCount > 0 ? 'text-rose-400' : 'text-emerald-400'}`} />
+            <div className="flex items-center justify-between text-neutral-400 mb-1">
+              <span className="text-[10px] font-mono font-medium uppercase tracking-wider">Attack Paths</span>
+              <Route className={`w-3.5 h-3.5 ${openAttackPathsCount > 0 ? 'text-red-400' : 'text-emerald-400'}`} />
             </div>
             <div
-              className={`text-2xl font-extrabold font-mono ${
-                openAttackPathsCount > 0 ? 'text-rose-400' : 'text-emerald-400'
+              className={`text-xl font-bold font-mono ${
+                openAttackPathsCount > 0 ? 'text-red-400' : 'text-emerald-400'
               }`}
             >
               {openAttackPathsCount} Open
             </div>
-            <div className="text-[10px] text-slate-400 mt-1 flex items-center space-x-1">
+            <div className="text-[10px] text-neutral-400 mt-0.5 flex items-center space-x-1">
               <span>{attackPaths.length} traversals</span>
               <span>•</span>
-              <span className="text-amber-400 font-bold">{risks.length} Risk Scores</span>
+              <span className="text-neutral-400 font-mono">{risks.length} Risk Scores</span>
             </div>
           </div>
 
           {/* Patch Propagation Lag Card */}
           <div
             onClick={() => setActiveTab('propagation')}
-            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+            className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
               exposedPropagationCount > 0
-                ? 'bg-amber-950/20 border-amber-500/40'
-                : 'bg-slate-900/60 border-slate-800'
-            } ${activeTab === 'propagation' ? 'ring-1 ring-amber-500/50' : 'hover:border-slate-700'}`}
+                ? 'bg-neutral-950 border-amber-900/60'
+                : 'bg-neutral-950 border-neutral-900'
+            } ${activeTab === 'propagation' ? 'ring-1 ring-neutral-600' : 'hover:border-neutral-800'}`}
           >
-            <div className="flex items-center justify-between text-slate-400 mb-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Patch Lag</span>
-              <RefreshCw className="w-4 h-4 text-amber-400" />
+            <div className="flex items-center justify-between text-neutral-400 mb-1">
+              <span className="text-[10px] font-mono font-medium uppercase tracking-wider">Patch Lag</span>
+              <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
             </div>
-            <div className="text-2xl font-extrabold text-amber-400 font-mono">
+            <div className="text-xl font-bold text-amber-400 font-mono">
               {exposedPropagationCount} Exposed
             </div>
-            <div className="text-[10px] text-slate-400 mt-1">
-              {propagationRecords.length} packages tracking fix
+            <div className="text-[10px] text-neutral-400 mt-0.5">
+              {propagationRecords.length} packages tracking
             </div>
           </div>
 
           {/* Upstream Changes Card */}
           <div
             onClick={() => setActiveTab('upstream')}
-            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+            className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
               activeTab === 'upstream'
-                ? 'bg-indigo-950/40 border-indigo-500/50 ring-1 ring-indigo-500/30'
-                : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                ? 'bg-neutral-900 border-neutral-700 ring-1 ring-neutral-700'
+                : 'bg-neutral-950 border-neutral-900 hover:border-neutral-800'
             }`}
           >
-            <div className="flex items-center justify-between text-slate-400 mb-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Upstream Signals</span>
-              <GitCommit className="w-4 h-4 text-purple-400" />
+            <div className="flex items-center justify-between text-neutral-400 mb-1">
+              <span className="text-[10px] font-mono font-medium uppercase tracking-wider">Upstream</span>
+              <GitCommit className="w-3.5 h-3.5 text-neutral-400" />
             </div>
-            <div className="text-2xl font-extrabold text-white font-mono">{upstreamCommits.length}</div>
-            <div className="text-[10px] text-slate-400 mt-1">Heuristic commit classifications</div>
+            <div className="text-xl font-bold text-white font-mono">{upstreamCommits.length}</div>
+            <div className="text-[10px] text-neutral-400 mt-0.5">Heuristic signals</div>
           </div>
 
           {/* Remediation Approval Gate Card */}
           <div
             onClick={() => setActiveTab('remediation')}
-            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+            className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
               pendingApprovalsCount > 0
-                ? 'bg-emerald-950/30 border-emerald-500/40'
-                : 'bg-slate-900/60 border-slate-800'
-            } ${activeTab === 'remediation' ? 'ring-1 ring-emerald-500/50' : 'hover:border-slate-700'}`}
+                ? 'bg-neutral-950 border-emerald-900/60'
+                : 'bg-neutral-950 border-neutral-900'
+            } ${activeTab === 'remediation' ? 'ring-1 ring-neutral-600' : 'hover:border-neutral-800'}`}
           >
-            <div className="flex items-center justify-between text-slate-400 mb-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Approval Gate</span>
-              <GitPullRequest className="w-4 h-4 text-emerald-400" />
+            <div className="flex items-center justify-between text-neutral-400 mb-1">
+              <span className="text-[10px] font-mono font-medium uppercase tracking-wider">Approval Gate</span>
+              <GitPullRequest className="w-3.5 h-3.5 text-emerald-400" />
             </div>
-            <div className="text-2xl font-extrabold text-emerald-400 font-mono">
+            <div className="text-xl font-bold text-emerald-400 font-mono">
               {pendingApprovalsCount} PRs
             </div>
-            <div className="text-[10px] text-slate-400 mt-1">
-              Human-in-the-loop pending review
+            <div className="text-[10px] text-neutral-400 mt-0.5">
+              Human review pending
             </div>
           </div>
         </div>
 
         {/* View Switcher Container */}
-        <div className="pt-2">
+        <div className="pt-1">
           {activeTab === 'inventory' && (
             <section className="space-y-4">
               <InventoryTable
@@ -341,7 +341,7 @@ export const App: React.FC = () => {
         onSuccess={loadAllData}
       />
 
-      {/* Deep Component Lineage Modal */}
+      {/* Component Lineage Modal */}
       <LineageModal
         component={selectedComponent}
         onClose={() => setSelectedComponent(null)}

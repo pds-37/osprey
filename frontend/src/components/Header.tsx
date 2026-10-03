@@ -35,38 +35,33 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const tabs: { id: NavigationTab; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: 'inventory', label: 'Inventory', icon: Layers },
-    { id: 'graph', label: 'Knowledge Graph', icon: Network },
+    { id: 'graph', label: 'Graph', icon: Network },
     { id: 'attack-paths', label: 'Attack Paths', icon: Route },
     { id: 'propagation', label: 'Propagation', icon: RefreshCw },
-    { id: 'upstream', label: 'Upstream Changes', icon: GitCommit },
-    { id: 'remediation', label: 'Remediation PRs', icon: GitPullRequest },
+    { id: 'upstream', label: 'Upstream', icon: GitCommit },
+    { id: 'remediation', label: 'Remediation', icon: GitPullRequest },
     { id: 'ai', label: 'AI Analyst', icon: Sparkles },
   ];
 
   return (
-    <header className="border-b border-slate-800 bg-[#0c1322]/95 backdrop-blur sticky top-0 z-40">
+    <header className="border-b border-neutral-900 bg-black/95 backdrop-blur sticky top-0 z-40 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="h-16 flex items-center justify-between gap-4">
-          {/* Logo & Platform Info */}
+        <div className="h-14 flex items-center justify-between gap-4">
+          {/* Minimalist Logo & Brand */}
           <div className="flex items-center space-x-3 shrink-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Shield className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-white">
+              <Shield className="w-4 h-4 text-white" />
             </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-extrabold text-base text-white tracking-tight">GuardianOS</span>
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                  v2.0
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 font-medium hidden sm:block">
-                Supply Chain & Attack Path Control Plane
-              </p>
+            <div className="flex items-center space-x-2">
+              <span className="font-bold text-sm tracking-tight text-white">GuardianOS</span>
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-neutral-900 text-neutral-400 border border-neutral-800">
+                v2.0
+              </span>
             </div>
           </div>
 
-          {/* Center Navigation Tabs */}
-          <nav className="hidden lg:flex items-center space-x-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800/80">
+          {/* Minimalist Center Navigation Tabs */}
+          <nav className="hidden lg:flex items-center space-x-1 bg-neutral-950 p-1 rounded-lg border border-neutral-900">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -74,10 +69,10 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs transition-all ${
                     isActive
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-bold'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      ? 'bg-neutral-100 text-black font-semibold shadow-sm'
+                      : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/80 font-normal'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -87,16 +82,16 @@ export const Header: React.FC<HeaderProps> = ({
             })}
           </nav>
 
-          {/* Right Actions */}
+          {/* Right Status & Ingest Action */}
           <div className="flex items-center space-x-3 shrink-0">
-            <div className="hidden md:flex items-center space-x-1.5 text-[11px] font-mono px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <div className="hidden sm:flex items-center space-x-1.5 text-[11px] font-mono px-2.5 py-1 rounded-md bg-neutral-950 border border-neutral-900 text-neutral-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               <span>{systemStatus}</span>
             </div>
 
             <button
               onClick={onOpenUpload}
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-indigo-600/25 transition-all"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-white hover:bg-neutral-200 text-black transition-all"
             >
               <Upload className="w-3.5 h-3.5" />
               <span>Ingest SBOM</span>
@@ -105,7 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Responsive sub-bar for smaller screens */}
-        <div className="lg:hidden pb-2.5 overflow-x-auto flex items-center space-x-1 border-t border-slate-800/60 pt-2">
+        <div className="lg:hidden pb-2 overflow-x-auto flex items-center space-x-1 border-t border-neutral-900 pt-1.5">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -113,10 +108,10 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs whitespace-nowrap transition-all ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow font-bold'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    ? 'bg-neutral-100 text-black font-semibold'
+                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />

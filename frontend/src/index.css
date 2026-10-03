@@ -3,20 +3,48 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg-main: #000000;
+    --bg-surface: #09090b;
+    --bg-surface-elevated: #121214;
+    --border-subtle: #1f1f23;
+  }
+
   body {
-    background-color: #080c14;
-    color: #f1f5f9;
+    background-color: #000000;
+    color: #ededed;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom minimalist dark scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #000000;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #222225;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #333338;
   }
 }
 
-/* Custom glowing badge styling */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.minimal-panel {
+  background: #09090b;
+  border: 1px solid #1f1f23;
 }
 
-.glass-panel-hover:hover {
-  border-color: rgba(59, 130, 246, 0.4);
-  box-shadow: 0 0 25px rgba(59, 130, 246, 0.15);
+.minimal-panel-hover {
+  transition: all 0.15s ease-in-out;
+}
+
+.minimal-panel-hover:hover {
+  border-color: #333338;
+  background: #0d0d10;
 }
