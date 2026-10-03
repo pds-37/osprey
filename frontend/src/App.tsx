@@ -1,13 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Header, NavigationTab } from './components/Header';
-import { FlagshipDemoBanner } from './components/FlagshipDemoBanner';
-import { InventoryTable } from './components/InventoryTable';
-import { DependencyGraphCanvas } from './components/DependencyGraphCanvas';
-import { AttackPathsView } from './components/AttackPathsView';
-import { PatchPropagationView } from './components/PatchPropagationView';
-import { UpstreamChangesView } from './components/UpstreamChangesView';
+import { Header, MainWorkspace } from './components/Header';
+import { ThreatCenterView } from './components/ThreatCenterView';
+import { SupplyChainView } from './components/SupplyChainView';
 import { RemediationCenter } from './components/RemediationCenter';
-import { AiAnalystConsole } from './components/AiAnalystConsole';
+import { AiCopilotDrawer } from './components/AiCopilotDrawer';
 import { SbomUploadModal } from './components/SbomUploadModal';
 import { LineageModal } from './components/LineageModal';
 
@@ -15,7 +11,6 @@ import {
   AttackPath,
   CommitRecord,
   ComponentItem,
-  ContextualRiskScore,
   GraphData,
   PatchPropagationRecord,
   RemediationTask,
@@ -29,26 +24,20 @@ import {
   fetchHealth,
   fetchPatchPropagation,
   fetchRemediationTasks,
-  fetchRisks,
   fetchSboms,
   fetchUpstreamChanges,
   queryAIAnalyst,
   recalculateAttackPaths,
+  runFlagshipDemo,
   verifyRemediationTask,
 } from './api';
-import {
-  Layers,
-  Route,
-  GitPullRequest,
-  RefreshCw,
-  GitCommit,
-} from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<NavigationTab>('inventory');
+  const [activeWorkspace, setActiveWorkspace] = useState<MainWorkspace>('threats');
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [copilotTarget, setCopilotTarget] = useState('libheif');
   const [selectedComponent, setSelectedComponent] = useState<ComponentItem | null>(null);
-  const [aiTargetComponent, setAiTargetComponent] = useState('libheif');
 
   // Core Data States
   const [components, setComponents] = useState<ComponentItem[]>([]);
@@ -58,12 +47,7 @@ export const App: React.FC = () => {
   const [propagationRecords, setPropagationRecords] = useState<PatchPropagationRecord[]>([]);
   const [upstreamCommits, setUpstreamCommits] = useState<CommitRecord[]>([]);
   const [remediationTasks, setRemediationTasks] = useState<RemediationTask[]>([]);
-  const [risks, setRisks] = useState<ContextualRiskScore[]>([]);
   const [systemStatus, setSystemStatus] = useState('ONLINE · v2.0.0');
-
-  // Inventory Filters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedEcosystem, setSelectedEcosystem] = useState('all');
 
   const loadAllData = async () => {
     try {
@@ -76,17 +60,15 @@ export const App: React.FC = () => {
         patches,
         commits,
         remediations,
-        riskList,
       ] = await Promise.all([
         fetchHealth().catch(() => ({ status: 'healthy', version: '2.0.0' })),
-        fetchComponents(selectedEcosystem === 'all' ? undefined : selectedEcosystem, searchQuery).catch(() => []),
+        fetchComponents().catch(() => []),
         fetchSboms().catch(() => []),
         fetchGraphData().catch(() => ({ nodes: [], edges: [], summary: {} })),
         fetchAttackPaths().catch(() => []),
         fetchPatchPropagation().catch(() => []),
         fetchUpstreamChanges().catch(() => []),
         fetchRemediationTasks().catch(() => []),
-        fetchRisks().catch(() => []),
       ]);
 
       setSystemStatus(`${health.status.toUpperCase()} · v${health.version}`);
@@ -97,7 +79,6 @@ export const App: React.FC = () => {
       setPropagationRecords(patches);
       setUpstreamCommits(commits);
       setRemediationTasks(remediations);
-      setRisks(riskList);
     } catch (e) {
       console.error('Error fetching dashboard data:', e);
     }
@@ -105,9 +86,26 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     loadAllData();
-  }, [selectedEcosystem, searchQuery]);
+  }, []);
 
-  // Actions
+  // Global Keyboard Shortcut: Cmd+K / Ctrl+K opens Copilot
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCopilotOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Action Handlers
+  const handleRunDemo = async () => {
+    await runFlagshipDemo();
+    await loadAllData();
+  };
+
   const handleRecalculateAttackPaths = async () => {
     const updated = await recalculateAttackPaths();
     setAttackPaths(updated);
@@ -124,224 +122,77 @@ export const App: React.FC = () => {
     await loadAllData();
   };
 
-  const handleOpenAI = (componentName: string) => {
-    setAiTargetComponent(componentName);
-    setActiveTab('ai');
+  const handleOpenCopilot = (componentName: string) => {
+    setCopilotTarget(componentName);
+    setIsCopilotOpen(true);
   };
 
-  // Metric Computations
-  const totalComponents = components.length;
-  const runningComponents = components.filter((c) => c.state === 'RUNNING').length;
-  const openAttackPathsCount = attackPaths.filter((p) => p.status === 'OPEN').length;
-  const exposedPropagationCount = propagationRecords.filter((p) => p.is_production_exposed).length;
-  const pendingApprovalsCount = remediationTasks.filter((t) => t.status === 'PENDING_APPROVAL').length;
+  const hasOpenThreats = attackPaths.some((p) => p.status === 'OPEN');
+  const pendingPRsCount = remediationTasks.filter((t) => t.status === 'PENDING_APPROVAL').length;
 
   return (
     <div className="min-h-screen bg-black text-neutral-200 flex flex-col font-sans selection:bg-neutral-800 selection:text-white">
-      {/* Top Application Header */}
+      {/* 1. Header with 3 Unified Workspaces */}
       <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        activeWorkspace={activeWorkspace}
+        setActiveWorkspace={setActiveWorkspace}
         onOpenUpload={() => setIsUploadOpen(true)}
+        onToggleCopilot={() => setIsCopilotOpen((prev) => !prev)}
         systemStatus={systemStatus}
+        hasOpenThreats={hasOpenThreats}
+        pendingPRsCount={pendingPRsCount}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5">
-        {/* Flagship Demo Banner */}
-        <FlagshipDemoBanner onDemoComplete={loadAllData} />
+      {/* 2. Main Content Canvas */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5">
+        {activeWorkspace === 'threats' && (
+          <ThreatCenterView
+            attackPaths={attackPaths}
+            propagationRecords={propagationRecords}
+            upstreamCommits={upstreamCommits}
+            onOpenAI={handleOpenCopilot}
+            onGoToRemediation={() => setActiveWorkspace('remediation')}
+            onRunDemo={handleRunDemo}
+            onRecalculate={handleRecalculateAttackPaths}
+          />
+        )}
 
-        {/* Minimalist Telemetry & KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5">
-          {/* Total Components Card */}
-          <div
-            onClick={() => setActiveTab('inventory')}
-            className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-              activeTab === 'inventory'
-                ? 'bg-neutral-900 border-neutral-700 ring-1 ring-neutral-700'
-                : 'bg-neutral-950 border-neutral-900 hover:border-neutral-800'
-            }`}
-          >
-            <div className="flex items-center justify-between text-neutral-400 mb-1">
-              <span className="text-[10px] font-mono font-medium uppercase tracking-wider">Components</span>
-              <Layers className="w-3.5 h-3.5 text-neutral-400" />
-            </div>
-            <div className="text-xl font-bold text-white font-mono">{totalComponents}</div>
-            <div className="text-[10px] text-neutral-400 mt-0.5 flex items-center space-x-1">
-              <span>{runningComponents} Running</span>
-              <span>•</span>
-              <span>{sboms.length} SBOMs</span>
-            </div>
-          </div>
+        {activeWorkspace === 'supply-chain' && (
+          <SupplyChainView
+            components={components}
+            sboms={sboms}
+            graphData={graphData}
+            onRefresh={loadAllData}
+            onOpenLineage={(comp) => setSelectedComponent(comp)}
+          />
+        )}
 
-          {/* Adversary Attack Paths Card */}
-          <div
-            onClick={() => setActiveTab('attack-paths')}
-            className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-              openAttackPathsCount > 0
-                ? 'bg-neutral-950 border-red-900/60'
-                : 'bg-neutral-950 border-neutral-900'
-            } ${activeTab === 'attack-paths' ? 'ring-1 ring-neutral-600' : 'hover:border-neutral-800'}`}
-          >
-            <div className="flex items-center justify-between text-neutral-400 mb-1">
-              <span className="text-[10px] font-mono font-medium uppercase tracking-wider">Attack Paths</span>
-              <Route className={`w-3.5 h-3.5 ${openAttackPathsCount > 0 ? 'text-red-400' : 'text-emerald-400'}`} />
-            </div>
-            <div
-              className={`text-xl font-bold font-mono ${
-                openAttackPathsCount > 0 ? 'text-red-400' : 'text-emerald-400'
-              }`}
-            >
-              {openAttackPathsCount} Open
-            </div>
-            <div className="text-[10px] text-neutral-400 mt-0.5 flex items-center space-x-1">
-              <span>{attackPaths.length} traversals</span>
-              <span>•</span>
-              <span className="text-neutral-400 font-mono">{risks.length} Risk Scores</span>
-            </div>
-          </div>
-
-          {/* Patch Propagation Lag Card */}
-          <div
-            onClick={() => setActiveTab('propagation')}
-            className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-              exposedPropagationCount > 0
-                ? 'bg-neutral-950 border-amber-900/60'
-                : 'bg-neutral-950 border-neutral-900'
-            } ${activeTab === 'propagation' ? 'ring-1 ring-neutral-600' : 'hover:border-neutral-800'}`}
-          >
-            <div className="flex items-center justify-between text-neutral-400 mb-1">
-              <span className="text-[10px] font-mono font-medium uppercase tracking-wider">Patch Lag</span>
-              <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-            </div>
-            <div className="text-xl font-bold text-amber-400 font-mono">
-              {exposedPropagationCount} Exposed
-            </div>
-            <div className="text-[10px] text-neutral-400 mt-0.5">
-              {propagationRecords.length} packages tracking
-            </div>
-          </div>
-
-          {/* Upstream Changes Card */}
-          <div
-            onClick={() => setActiveTab('upstream')}
-            className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-              activeTab === 'upstream'
-                ? 'bg-neutral-900 border-neutral-700 ring-1 ring-neutral-700'
-                : 'bg-neutral-950 border-neutral-900 hover:border-neutral-800'
-            }`}
-          >
-            <div className="flex items-center justify-between text-neutral-400 mb-1">
-              <span className="text-[10px] font-mono font-medium uppercase tracking-wider">Upstream</span>
-              <GitCommit className="w-3.5 h-3.5 text-neutral-400" />
-            </div>
-            <div className="text-xl font-bold text-white font-mono">{upstreamCommits.length}</div>
-            <div className="text-[10px] text-neutral-400 mt-0.5">Heuristic signals</div>
-          </div>
-
-          {/* Remediation Approval Gate Card */}
-          <div
-            onClick={() => setActiveTab('remediation')}
-            className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-              pendingApprovalsCount > 0
-                ? 'bg-neutral-950 border-emerald-900/60'
-                : 'bg-neutral-950 border-neutral-900'
-            } ${activeTab === 'remediation' ? 'ring-1 ring-neutral-600' : 'hover:border-neutral-800'}`}
-          >
-            <div className="flex items-center justify-between text-neutral-400 mb-1">
-              <span className="text-[10px] font-mono font-medium uppercase tracking-wider">Approval Gate</span>
-              <GitPullRequest className="w-3.5 h-3.5 text-emerald-400" />
-            </div>
-            <div className="text-xl font-bold text-emerald-400 font-mono">
-              {pendingApprovalsCount} PRs
-            </div>
-            <div className="text-[10px] text-neutral-400 mt-0.5">
-              Human review pending
-            </div>
-          </div>
-        </div>
-
-        {/* View Switcher Container */}
-        <div className="pt-1">
-          {activeTab === 'inventory' && (
-            <section className="space-y-4">
-              <InventoryTable
-                components={components}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                selectedEcosystem={selectedEcosystem}
-                setSelectedEcosystem={setSelectedEcosystem}
-                onSelectComponent={(comp) => setSelectedComponent(comp)}
-              />
-            </section>
-          )}
-
-          {activeTab === 'graph' && (
-            <section className="space-y-4">
-              <DependencyGraphCanvas
-                graphData={graphData}
-                onRefresh={loadAllData}
-              />
-            </section>
-          )}
-
-          {activeTab === 'attack-paths' && (
-            <section className="space-y-4">
-              <AttackPathsView
-                attackPaths={attackPaths}
-                onRecalculate={handleRecalculateAttackPaths}
-                onOpenAI={handleOpenAI}
-              />
-            </section>
-          )}
-
-          {activeTab === 'propagation' && (
-            <section className="space-y-4">
-              <PatchPropagationView
-                records={propagationRecords}
-                onRefresh={loadAllData}
-                onOpenAI={handleOpenAI}
-                onOpenRemediation={() => setActiveTab('remediation')}
-              />
-            </section>
-          )}
-
-          {activeTab === 'upstream' && (
-            <section className="space-y-4">
-              <UpstreamChangesView commits={upstreamCommits} />
-            </section>
-          )}
-
-          {activeTab === 'remediation' && (
-            <section className="space-y-4">
-              <RemediationCenter
-                tasks={remediationTasks}
-                onApprove={handleApproveTask}
-                onVerify={handleVerifyTask}
-                onRefresh={loadAllData}
-              />
-            </section>
-          )}
-
-          {activeTab === 'ai' && (
-            <section className="space-y-4">
-              <AiAnalystConsole
-                onQuery={queryAIAnalyst}
-                initialComponent={aiTargetComponent}
-              />
-            </section>
-          )}
-        </div>
+        {activeWorkspace === 'remediation' && (
+          <RemediationCenter
+            tasks={remediationTasks}
+            onApprove={handleApproveTask}
+            onVerify={handleVerifyTask}
+            onRefresh={loadAllData}
+          />
+        )}
       </main>
 
-      {/* Ingestion Modal */}
+      {/* 3. Slide-Over AI Copilot Drawer (Cmd+K) */}
+      <AiCopilotDrawer
+        isOpen={isCopilotOpen}
+        onClose={() => setIsCopilotOpen(false)}
+        targetComponent={copilotTarget}
+        onQuery={queryAIAnalyst}
+      />
+
+      {/* 4. Ingest SBOM Modal */}
       <SbomUploadModal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
         onSuccess={loadAllData}
       />
 
-      {/* Component Lineage Modal */}
+      {/* 5. Component Lineage Modal */}
       <LineageModal
         component={selectedComponent}
         onClose={() => setSelectedComponent(null)}
