@@ -66,15 +66,25 @@ export async function uploadSbomJson(payload: {
   return res.json();
 }
 
-export async function scanLocalWorkspace(path?: string, appName?: string): Promise<IngestionResult> {
+export async function scanLocalWorkspace(path?: string, appName?: string, clearExisting: boolean = true): Promise<IngestionResult> {
   const res = await fetch(`${BASE_URL}/sboms/scan-local-manifests`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, app_name: appName }),
+    body: JSON.stringify({ path, app_name: appName, clear_existing: clearExisting }),
   });
-  if (!res.ok) throw new Error('Failed to scan workspace manifests');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'Failed to scan workspace manifests');
+  }
   return res.json();
 }
+
+export async function clearInventory(): Promise<{ status: string; message: string }> {
+  const res = await fetch(`${BASE_URL}/sboms/clear`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to clear inventory');
+  return res.json();
+}
+
 
 export async function fetchVulnerabilities(): Promise<VulnerabilityFinding[]> {
   const res = await fetch(`${BASE_URL}/vulnerabilities`);

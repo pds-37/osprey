@@ -70,10 +70,21 @@ async def list_sboms():
     return inventory_service.list_sboms()
 
 
+@router.post("/clear", status_code=status.HTTP_200_OK)
+async def clear_inventory():
+    """Clear all inventory components, SBOMs, graph nodes, and vulnerability records."""
+    from guardianos.intel.service import intel_service
+    inventory_service.clear()
+    intel_service.clear()
+    return {"status": "cleared", "message": "Inventory and vulnerability cache wiped successfully"}
+
+
+
 class ScanWorkspaceRequest(BaseModel):
     path: Optional[str] = Field(None, description="Path to scan (defaults to project workspace)")
     app_name: Optional[str] = Field(None, description="Optional application name")
     environment: str = Field("production", description="Target environment")
+    clear_existing: bool = Field(True, description="Clear previous inventory to isolate new scan results")
 
 
 @router.post("/scan-local-manifests", response_model=IngestionResult, status_code=status.HTTP_201_CREATED)
@@ -81,18 +92,33 @@ async def scan_local_workspace(payload: Optional[ScanWorkspaceRequest] = None):
     """Scan real package manifests (package.json, requirements.txt, Dockerfile, etc.) directly from any target folder."""
     import os
     from guardianos.inventory.scanner import scan_directory_manifests
+    from guardianos.intel.service import intel_service
     
     target_path = payload.path if (payload and payload.path) else os.getcwd()
     app_name = payload.app_name if (payload and payload.app_name) else None
     env = payload.environment if (payload and payload.environment) else "production"
+    clear_first = payload.clear_existing if (payload and payload.clear_existing is not None) else True
 
-    result, manifests = scan_directory_manifests(
-        target_dir=target_path,
-        app_name=app_name,
-        environment=env
-    )
-    result.summary["manifests"] = manifests
-    return result
+    if clear_first:
+        inventory_service.clear()
+        intel_service.clear()
+
+    try:
+        result, manifests = scan_directory_manifests(
+            target_dir=target_path,
+            app_name=app_name,
+            environment=env
+        )
+        result.summary["manifests"] = manifests
+        # Query vulnerabilities on all newly ingested real components
+        intel_service.scan_all_components()
+        return result
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Scan error: {str(e)}")
 
 
 @router.get("/{sbom_id}", response_model=SBOMDocument)

@@ -1,8 +1,8 @@
 """Plug-and-Play Multi-Manifest Workspace Scanner for Osprey.
 
 Automatically discovers and parses:
-- JavaScript/TypeScript (package.json)
-- Python (requirements.txt, pyproject.toml)
+- JavaScript/TypeScript (package.json, lockfiles, or script imports)
+- Python (requirements.txt, pyproject.toml, or script imports)
 - Go (go.mod)
 - Rust (Cargo.toml)
 - Containers (Dockerfile)
@@ -15,7 +15,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from guardianos.inventory.models import DependencyState, IngestionResult
 from guardianos.inventory.service import inventory_service
@@ -34,15 +34,63 @@ SKIP_DIRS = {
     ".next",
     ".cache",
     "target",
+    "site-packages",
+}
+
+PYTHON_STDLIB: Set[str] = {
+    "sys", "os", "json", "time", "re", "math", "pathlib", "typing", "logging",
+    "subprocess", "urllib", "collections", "itertools", "unittest", "dataclasses",
+    "enum", "shutil", "tempfile", "hashlib", "socket", "threading", "asyncio",
+    "functools", "abc", "copy", "io", "random", "string", "struct", "platform",
+    "uuid", "datetime", "warnings", "traceback", "inspect", "glob", "xml", "csv"
 }
 
 
 def _clean_version(ver_str: str) -> str:
     """Strip semver range specifiers to isolate base version."""
     cleaned = re.sub(r"^[~^>=<!\s]+", "", ver_str.strip())
-    # Handle comma separated ranges like >=1.0,<2.0 -> take first clean part
     cleaned = cleaned.split(",")[0].strip()
     return cleaned or "0.0.1"
+
+
+def _resolve_target_path(target_dir: str | Path) -> Path:
+    """Intelligently resolve user target path, including Downloads, Desktop, and ~ shortcuts."""
+    raw = str(target_dir).strip().replace("\\", "/")
+    
+    # 1. Expand ~
+    if raw.startswith("~"):
+        p = Path(raw).expanduser().resolve()
+        if p.exists():
+            return p
+
+    # 2. Check direct path
+    p = Path(raw).resolve()
+    if p.exists():
+        return p
+
+    # 3. Check common user directories for Windows/macOS/Linux
+    clean_name = raw.lstrip("./").lstrip("/").lower()
+    home = Path.home()
+    if clean_name in ["downloads", "download"]:
+        cand = (home / "Downloads").resolve()
+        if cand.exists():
+            return cand
+    elif clean_name in ["desktop"]:
+        cand = (home / "Desktop").resolve()
+        if cand.exists():
+            return cand
+    elif clean_name in ["documents"]:
+        cand = (home / "Documents").resolve()
+        if cand.exists():
+            return cand
+
+    # 4. Check workspace subdirectories
+    workspace = Path(os.getcwd())
+    cand = (workspace / clean_name).resolve()
+    if cand.exists():
+        return cand
+
+    return p
 
 
 def scan_directory_manifests(
@@ -51,10 +99,13 @@ def scan_directory_manifests(
     environment: str = "production",
     default_state: DependencyState = DependencyState.INSTALLED
 ) -> Tuple[IngestionResult, List[str]]:
-    """Scan a target workspace directory for all recognized software manifests."""
-    root_path = Path(target_dir).resolve()
+    """Scan a target workspace directory for all recognized software manifests and source imports."""
+    root_path = _resolve_target_path(target_dir)
     if not root_path.exists():
-        raise FileNotFoundError(f"Target path '{root_path}' does not exist.")
+        raise FileNotFoundError(
+            f"Directory '{target_dir}' does not exist on this machine (checked '{root_path}'). "
+            f"Please enter an existing folder path, e.g. '.', './frontend', './backend', or your absolute project path."
+        )
 
     discovered_manifests: List[str] = []
     components: List[Dict[str, Any]] = []
@@ -64,14 +115,20 @@ def scan_directory_manifests(
         app_name = root_path.name or "osprey-workspace"
     app_purl = f"pkg:generic/{app_name}@1.0.0"
 
-    # Search up to depth 3
+    # Search directory tree up to depth 2 (capped at 80 folders for speed)
+    dirs_visited = 0
     for current_dir, dirs, files in os.walk(root_path):
-        # Modify dirs in-place to avoid descending into blacklisted directories
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
+        dirs_visited += 1
 
-        depth = len(Path(current_dir).relative_to(root_path).parts)
-        if depth > 3:
-            continue
+        try:
+            depth = len(Path(current_dir).relative_to(root_path).parts)
+        except Exception:
+            depth = 0
+
+        if depth >= 2 or dirs_visited > 80:
+            dirs.clear()
+
 
         dir_path = Path(current_dir)
 
@@ -108,7 +165,6 @@ def scan_directory_manifests(
                         line = line.strip()
                         if not line or line.startswith("#") or line.startswith("-"):
                             continue
-                        # Match package==1.2.3 or package>=1.2.3
                         m = re.match(r"^([a-zA-Z0-9_\-\.]+)([=><~^!]+.*)?", line)
                         if m:
                             pkg_name = m.group(1).lower()
@@ -155,22 +211,89 @@ def scan_directory_manifests(
             except Exception as e:
                 logger.debug("Failed to parse %s: %s", df_path, e)
 
+    # 4. Fallback Import Scanner: If no standard manifest files were found, extract loose imports from source files!
+    if not discovered_manifests:
+        extracted_python_pkgs: Set[str] = set()
+        extracted_npm_pkgs: Set[str] = set()
+        scanned_files = 0
+
+        for current_dir, dirs, files in os.walk(root_path):
+            dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
+            try:
+                depth = len(Path(current_dir).relative_to(root_path).parts)
+            except Exception:
+                depth = 0
+            if depth >= 2 or scanned_files > 40:
+                dirs.clear()
+            if scanned_files > 40:
+                break
+            for f in files:
+
+                f_path = Path(current_dir) / f
+                if f.endswith(".py"):
+                    scanned_files += 1
+                    try:
+                        with open(f_path, "r", encoding="utf-8", errors="ignore") as pf:
+                            for line in pf:
+                                line = line.strip()
+                                m = re.match(r"^(?:from|import)\s+([a-zA-Z0-9_]+)", line)
+                                if m:
+                                    mod = m.group(1).lower()
+                                    if mod not in PYTHON_STDLIB and len(mod) > 1:
+                                        extracted_python_pkgs.add(mod)
+                    except Exception:
+                        pass
+                elif f.endswith((".js", ".jsx", ".ts", ".tsx")):
+                    scanned_files += 1
+                    try:
+                        with open(f_path, "r", encoding="utf-8", errors="ignore") as jf:
+                            for line in jf:
+                                line = line.strip()
+                                m = re.search(r"(?:import|from|require\()\s*['\"]([a-zA-Z0-9@/_\-]+)['\"]", line)
+                                if m:
+                                    mod = m.group(1)
+                                    if not mod.startswith(".") and not mod.startswith("/"):
+                                        pkg_root = mod.split("/")[0] if not mod.startswith("@") else "/".join(mod.split("/")[:2])
+                                        extracted_npm_pkgs.add(pkg_root)
+                    except Exception:
+                        pass
+
+        for p in extracted_python_pkgs:
+            purl = f"pkg:pypi/{p}@latest"
+            components.append({
+                "name": p,
+                "version": "latest",
+                "type": "library",
+                "purl": purl,
+            })
+            dependencies.append(purl)
+
+        for p in extracted_npm_pkgs:
+            purl = f"pkg:npm/{p}@latest"
+            components.append({
+                "name": p,
+                "version": "latest",
+                "type": "library",
+                "purl": purl,
+            })
+            dependencies.append(purl)
+
+        if components:
+            discovered_manifests.append(f"Inferred from {scanned_files} source code files")
+
+    # If completely empty and no code found
+    if not components:
+        raise ValueError(
+            f"Directory '{root_path.name}' exists, but contains 0 recognized manifests or third-party package imports. "
+            f"Osprey scans for: package.json (npm), requirements.txt / pyproject.toml (pip), Dockerfile, go.mod, or Cargo.toml."
+        )
+
     # De-duplicate components by PURL
     unique_components = {}
     for comp in components:
         unique_components[comp["purl"]] = comp
     components_list = list(unique_components.values())
     unique_deps = list(set(dependencies))
-
-    # If no components were detected, provide workspace default
-    if not components_list:
-        components_list.append({
-            "name": "fastapi",
-            "version": "0.110.0",
-            "type": "library",
-            "purl": "pkg:pypi/fastapi@0.110.0",
-        })
-        unique_deps.append("pkg:pypi/fastapi@0.110.0")
 
     cyclonedx_doc = {
         "bomFormat": "CycloneDX",
@@ -197,7 +320,7 @@ def scan_directory_manifests(
         application=app_name,
         environment=environment,
         default_state=default_state,
-        actor=f"workspace-scanner ({len(discovered_manifests)} manifests)",
+        actor=f"workspace-scanner ({len(discovered_manifests)} sources)",
     )
 
     return result, discovered_manifests

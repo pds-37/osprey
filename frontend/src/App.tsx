@@ -30,10 +30,11 @@ import {
   queryAIAnalyst,
   recalculateAttackPaths,
   runFlagshipDemo,
+  clearInventory,
   scanLocalWorkspace,
   verifyRemediationTask,
 } from './api';
-import { FolderGit2, Sparkles, RefreshCw } from 'lucide-react';
+import { FolderGit2, Sparkles, RefreshCw, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [isLanding, setIsLanding] = useState<boolean>(true);
@@ -55,6 +56,8 @@ export const App: React.FC = () => {
   const [isScanningWorkspace, setIsScanningWorkspace] = useState(false);
   const [targetPath, setTargetPath] = useState('.');
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+
 
   const loadAllData = async () => {
     try {
@@ -166,9 +169,9 @@ export const App: React.FC = () => {
       />
 
       {/* 2. Workspace Project Target Extension Bar */}
-      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-0">
+      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-0 space-y-2">
         <div className="p-3 bg-neutral-950 border border-neutral-900 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5 flex-1">
             <div className="w-6 h-6 rounded bg-neutral-900 border border-neutral-800 flex items-center justify-center text-white shrink-0">
               <FolderGit2 className="w-3.5 h-3.5 text-neutral-300" />
             </div>
@@ -177,20 +180,40 @@ export const App: React.FC = () => {
               <input
                 type="text"
                 value={targetPath}
-                onChange={(e) => setTargetPath(e.target.value)}
+                onChange={(e) => {
+                  setTargetPath(e.target.value);
+                  setScanError(null);
+                }}
                 placeholder="Path to folder or repo (e.g. .)"
                 className="text-xs font-mono text-neutral-200 bg-black px-2.5 py-1 rounded border border-neutral-800 focus:outline-none focus:border-neutral-600 w-36 sm:w-56"
               />
             </div>
-            {scanFeedback ? (
-              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-900/50">
-                {scanFeedback}
-              </span>
-            ) : (
-              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-900/50 hidden sm:inline">
-                OSV.dev Connected
-              </span>
-            )}
+
+            {/* Quick Presets */}
+            <div className="hidden sm:flex items-center space-x-1.5 text-[11px] font-mono">
+              <span className="text-neutral-500 text-[10px]">Presets:</span>
+              {[
+                { label: '. (Root)', path: '.' },
+                { label: './backend', path: './backend' },
+                { label: './frontend', path: './frontend' },
+                { label: 'Downloads', path: 'downloads' },
+              ].map((preset) => (
+                <button
+                  key={preset.path}
+                  onClick={() => {
+                    setTargetPath(preset.path);
+                    setScanError(null);
+                  }}
+                  className={`px-2 py-0.5 rounded border transition-colors ${
+                    targetPath === preset.path
+                      ? 'bg-neutral-800 text-white border-neutral-600 font-semibold'
+                      : 'bg-black text-neutral-400 border-neutral-800 hover:text-neutral-200 hover:border-neutral-700'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex items-center space-x-2 shrink-0">
@@ -198,13 +221,15 @@ export const App: React.FC = () => {
               disabled={isScanningWorkspace}
               onClick={async () => {
                 setIsScanningWorkspace(true);
+                setScanError(null);
+                setScanFeedback(null);
                 try {
-                  const res = await scanLocalWorkspace(targetPath);
-                  const manifestCount = res.summary?.manifests?.length || 1;
-                  setScanFeedback(`Indexed ${res.components_count} packages across ${manifestCount} manifests`);
+                  const res = await scanLocalWorkspace(targetPath, undefined, true);
+                  const manifestList = res.summary?.manifests?.join(', ') || 'manifests';
+                  setScanFeedback(`Indexed ${res.components_count} packages (${manifestList}) · Demo cleared`);
                   await loadAllData();
                 } catch (e: any) {
-                  setScanFeedback(`Scan failed: ${e.message}`);
+                  setScanError(e.message || 'Scan failed');
                 } finally {
                   setIsScanningWorkspace(false);
                 }
@@ -223,15 +248,70 @@ export const App: React.FC = () => {
                 </>
               )}
             </button>
+
+            <button
+              title="Clear all components and vulnerabilities from memory"
+              onClick={async () => {
+                try {
+                  await clearInventory();
+                  setScanFeedback('Inventory and vulnerabilities cleared. Workspace ready for new scan.');
+                  setScanError(null);
+                  await loadAllData();
+                } catch (e: any) {
+                  setScanError(`Failed to clear: ${e.message}`);
+                }
+              }}
+              className="px-2 py-1.5 bg-neutral-950 hover:bg-neutral-900 text-neutral-400 hover:text-rose-400 border border-neutral-800 text-xs rounded-md transition-all flex items-center space-x-1"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span className="hidden sm:inline">Clear</span>
+            </button>
+
             <button
               onClick={() => setIsUploadOpen(true)}
               className="px-2.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 text-xs rounded-md transition-all font-mono"
             >
-              + Ingest Custom SBOM
+              + Ingest SBOM
             </button>
           </div>
         </div>
+
+        {/* Scan Status / Error Diagnostics Banner */}
+        {scanFeedback && (
+          <div className="p-2.5 bg-emerald-950/40 border border-emerald-900/60 rounded-lg flex items-center justify-between text-xs font-mono text-emerald-300">
+            <div className="flex items-center space-x-2">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>{scanFeedback}</span>
+            </div>
+            <button
+              onClick={() => setScanFeedback(null)}
+              className="text-neutral-400 hover:text-neutral-200 text-[10px]"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {scanError && (
+          <div className="p-3 bg-rose-950/50 border border-rose-900/70 rounded-lg text-xs font-mono text-rose-300 flex items-start space-x-2.5">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-1">
+              <div className="font-semibold text-rose-200">Scan Notice:</div>
+              <div className="text-neutral-300 whitespace-pre-wrap">{scanError}</div>
+              <div className="text-[11px] text-neutral-400 pt-1">
+                Tip: Choose one of the preset paths above (e.g. <span className="text-white font-mono">. (Root)</span>, <span className="text-white font-mono">./backend</span>, or <span className="text-white font-mono">./frontend</span>), or provide an absolute directory path.
+              </div>
+            </div>
+            <button
+              onClick={() => setScanError(null)}
+              className="text-neutral-400 hover:text-neutral-200 text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
+
 
       {/* 3. Main Content Canvas */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">

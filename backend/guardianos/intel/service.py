@@ -90,12 +90,14 @@ class IntelService:
 
     def scan_all_components(self) -> List[VulnerabilityFinding]:
         """Scan all components currently in the software inventory."""
+        import concurrent.futures
         components = inventory_service.list_components(limit=1000)
         all_findings: List[VulnerabilityFinding] = []
         
-        for comp in components:
-            findings = self.match_component(comp)
-            all_findings.extend(findings)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            for findings in executor.map(self.match_component, components):
+                all_findings.extend(findings)
+
 
         if all_findings:
             record_audit_event(
