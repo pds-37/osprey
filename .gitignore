@@ -1,0 +1,27 @@
+# Node & Frontend
+node_modules/
+dist/
+.vite/
+
+# Python & Testing
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.venv/
+venv/
+
+# Database & Logs
+*.db
+*.sqlite
+*.log
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.env
