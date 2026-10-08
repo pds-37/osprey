@@ -1,16 +1,18 @@
 """Exposure Analyzer API endpoints."""
 
 from typing import List
-from fastapi import APIRouter, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from guardianos.exposure.models import EndpointProfile, ExposureProfile
 from guardianos.exposure.service import exposure_service
+from guardianos.api.security import SecuredAPIRouter
+from guardianos.core.security import require_single_organization
 
-router = APIRouter(prefix="/exposure", tags=["Exposure Analyzer"])
+router = SecuredAPIRouter(prefix="/exposure", tags=["Exposure Analyzer"], dependencies=[Depends(require_single_organization)])
 
 
 @router.get("/endpoints", response_model=List[EndpointProfile])
 async def list_endpoints():
-    """List registered network endpoints and ingress routes."""
+    """List registered endpoint assertions; external ingress is not independently verified."""
     return exposure_service.list_endpoints()
 
 
@@ -22,7 +24,7 @@ async def register_endpoint(endpoint: EndpointProfile):
 
 @router.get("/{component_name}", response_model=ExposureProfile)
 async def get_component_exposure(component_name: str):
-    """Retrieve runtime exposure profile distinguishing theoretical vs actually exposed reachability."""
+    """Retrieve source observations and user assertions; public ingress is not independently verified."""
     profile = exposure_service.get_component_exposure(component_name)
     if not profile:
         raise HTTPException(

@@ -16,8 +16,8 @@ from guardianos.inventory.normalizer import build_canonical_purl, normalize_ecos
 def parse_cyclonedx(
     data: Dict[str, Any],
     application: str = "default-app",
-    environment: str = "production",
-    default_state: DependencyState = DependencyState.INSTALLED
+    environment: str = "unknown",
+    default_state: DependencyState = DependencyState.UNKNOWN
 ) -> IngestionResult:
     spec_version = str(data.get("specVersion", "1.4"))
     sbom_id = str(data.get("serialNumber", f"urn:uuid:{uuid.uuid4()}"))
@@ -93,6 +93,21 @@ def parse_cyclonedx(
                 if lic_name:
                     licenses_list.append(lic_name)
 
+        raw_properties = comp.get("properties", [])
+        property_values = {
+            str(item.get("name")): str(item.get("value"))
+            for item in raw_properties
+            if isinstance(item, dict) and item.get("name") is not None and item.get("value") is not None
+        }
+        observation_state = default_state
+        claimed_state = property_values.get("osprey:observation_state")
+        if claimed_state:
+            try:
+                parsed_state = DependencyState(claimed_state.upper())
+                observation_state = parsed_state if parsed_state != DependencyState.RUNNING else DependencyState.UNKNOWN
+            except ValueError:
+                observation_state = DependencyState.UNKNOWN
+
         component_obj = Component(
             id=purl,
             name=name,
@@ -102,9 +117,15 @@ def parse_cyclonedx(
             checksum=checksum,
             environment=environment,
             application=application,
-            state=default_state,
+            state=observation_state,
+            source="workspace" if property_values.get("osprey:source_path") else "sbom",
+            location=property_values.get("osprey:source_path"),
+            dependency_type=property_values.get("osprey:dependency_type", "unknown"),
+            declared_version=version if observation_state == DependencyState.DECLARED else None,
+            locked_version=version if observation_state == DependencyState.LOCKED else None,
+            installed_version=version if observation_state == DependencyState.INSTALLED else None,
             licenses=licenses_list,
-            properties={"type": comp_type, "bom_ref": bom_ref}
+            properties={"type": comp_type, "bom_ref": bom_ref, **property_values}
         )
         components.append(component_obj)
 

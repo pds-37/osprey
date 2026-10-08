@@ -5,20 +5,56 @@ import os
 import json
 import pytest
 
+# Bundled advisories are explicit test fixtures; production does not load them by default.
+os.environ.setdefault("ENABLE_DEMO_FIXTURES", "true")
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ["STATE_DB_PATH"] = ":memory:"
+
 # Ensure backend directory is in sys.path
 backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend"))
 if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
+osprey_src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "osprey", "src"))
+if osprey_src_path not in sys.path:
+    sys.path.insert(0, osprey_src_path)
 
 from guardianos.inventory.service import inventory_service
 
 
 @pytest.fixture(autouse=True)
-def reset_service_state():
-    """Clear memory stores before each test."""
-    inventory_service.clear()
+def trusted_test_admin():
+    """Existing integration tests run as an explicit test admin, not anonymously."""
+    from guardianos.api.app import app
+    from guardianos.core.security import CurrentUser, UserRole, get_current_user
+
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(username="test-admin", role=UserRole.ADMIN)
     yield
-    inventory_service.clear()
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.fixture(autouse=True)
+def reset_service_state():
+    """Clear service indexes and their test-local SQLite records before and after each test."""
+    from guardianos.core.audit import clear_audit_events
+    from guardianos.attackpath.service import attack_path_service
+    from guardianos.exposure.service import exposure_service
+    from guardianos.intel.service import intel_service
+    from guardianos.propagation.service import propagation_service
+    from guardianos.remediation.service import remediation_service
+    from guardianos.risk.service import risk_service
+    from guardianos.upstream.service import upstream_service
+
+    services = (
+        inventory_service, intel_service, exposure_service, attack_path_service,
+        propagation_service, remediation_service, risk_service, upstream_service,
+    )
+    for service in services:
+        service.clear()
+    clear_audit_events()
+    yield
+    for service in services:
+        service.clear()
+    clear_audit_events()
 
 
 @pytest.fixture

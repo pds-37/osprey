@@ -16,8 +16,8 @@ from guardianos.inventory.normalizer import build_canonical_purl, normalize_ecos
 def parse_spdx(
     data: Dict[str, Any],
     application: str = "default-app",
-    environment: str = "production",
-    default_state: DependencyState = DependencyState.INSTALLED
+    environment: str = "unknown",
+    default_state: DependencyState = DependencyState.UNKNOWN
 ) -> IngestionResult:
     spec_version = str(data.get("spdxVersion", "SPDX-2.3"))
     sbom_id = str(data.get("SPDXID", f"SPDXRef-DOC-{uuid.uuid4()}"))

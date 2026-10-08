@@ -8,9 +8,14 @@ import json
 import logging
 import urllib.error
 import urllib.request
+from dataclasses import asdict
+from datetime import datetime
 from typing import List, Optional
 from guardianos.intel.models import VulnerabilityRecord, VulnerabilitySeverity, VulnerabilitySource
 from guardianos.inventory.models import Ecosystem
+from osprey.core.symbols import extract_osv_affected_records, extract_osv_vulnerable_symbols
+from osprey.core.evidence import canonical_json, content_digest
+from osprey.risk import parse_advisory_severity
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +29,17 @@ ECOSYSTEM_MAP = {
     Ecosystem.MAVEN: "Maven",
     Ecosystem.CARGO: "crates.io",
 }
+
+
+def _parse_timestamp(value: object) -> datetime | None:
+    """Parse a source-supplied timestamp; missing or malformed values stay unavailable."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed
 
 
 def query_live_osv(
@@ -61,38 +77,69 @@ def query_live_osv(
 
             for item in vulns:
                 vuln_id = item.get("id", "OSV-UNKNOWN")
-                summary = item.get("summary") or item.get("details", "")[:200]
-                details = item.get("details", "")
+                raw_summary = item.get("summary")
+                raw_details = item.get("details")
+                summary = raw_summary if isinstance(raw_summary, str) else ""
+                details = raw_details if isinstance(raw_details, str) else ""
+                if not summary:
+                    summary = details[:200]
 
-                # Estimate severity from database_specific or CVSS
-                severity = VulnerabilitySeverity.HIGH
-                cvss_score = 7.5
-                for s in item.get("severity", []):
-                    if s.get("type") == "CVSS_V3":
-                        score_str = s.get("score", "")
-                        if "CVSS:3" in score_str:
-                            severity = VulnerabilitySeverity.HIGH
-                            cvss_score = 8.0
+                severity_label, cvss_score = parse_advisory_severity(item)
+                severity = VulnerabilitySeverity(severity_label)
 
                 # Extract fixed versions if listed
                 fixed_versions = []
-                for affected in item.get("affected", []):
+                affected_ranges = []
+                affected_versions = []
+                introduced_versions = []
+                scoped_affected = [
+                    record for _index, record in extract_osv_affected_records(
+                        item,
+                        package=package_name,
+                        ecosystem=ecosystem.value,
+                    )
+                ]
+                symbol_mappings = extract_osv_vulnerable_symbols(
+                    item,
+                    package=package_name,
+                    ecosystem=ecosystem.value,
+                    vulnerability_id=vuln_id,
+                )
+                vulnerable_symbols = [mapping.symbol for mapping in symbol_mappings]
+                for affected in scoped_affected:
+                    for exact_version in affected.get("versions", []):
+                        exact_version = str(exact_version).strip()
+                        if exact_version and exact_version not in affected_versions:
+                            affected_versions.append(exact_version)
                     for r in affected.get("ranges", []):
+                        if isinstance(r, dict):
+                            affected_ranges.append(r)
                         for event in r.get("events", []):
                             if "fixed" in event:
                                 fixed_versions.append(event["fixed"])
+                            if "introduced" in event:
+                                introduced_versions.append(event["introduced"])
 
                 record = VulnerabilityRecord(
                     id=vuln_id,
                     component_name=package_name,
                     ecosystem=ecosystem,
-                    summary=summary[:255] if summary else f"Vulnerability in {package_name}",
+                    summary=summary[:255],
                     details=details[:1000] if details else "",
                     severity=severity,
                     cvss_score=cvss_score,
                     affected_version_ranges=[],
-                    fixed_versions=list(set(fixed_versions)),
-                    source=VulnerabilitySource.OSV
+                    affected_ranges=affected_ranges,
+                    affected_versions=list(dict.fromkeys(affected_versions)),
+                    introduced_versions=list(dict.fromkeys(introduced_versions)),
+                    vulnerable_symbols=list(dict.fromkeys(vulnerable_symbols)),
+                    vulnerable_symbol_mappings=[asdict(mapping) for mapping in symbol_mappings],
+                    query_matched_version=version,
+                    fixed_versions=list(dict.fromkeys(fixed_versions)),
+                    published_at=_parse_timestamp(item.get("published")),
+                    modified_at=_parse_timestamp(item.get("modified")),
+                    source_content_hash=content_digest(canonical_json(item)),
+                    source=VulnerabilitySource.OSV,
                 )
                 records.append(record)
 

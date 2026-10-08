@@ -35,6 +35,12 @@ class RiskService:
                 exposure=exposure,
                 attack_path=path
             )
+            f.evidence_ids = list(dict.fromkeys([*f.evidence_ids, *risk.evidence_ids]))
+            f.provenance_ids = {
+                **f.provenance_ids,
+                **risk.provenance_ids,
+            }
+            intel_service.save_finding(f)
             _risks_db[risk.id] = risk
             results.append(risk)
 
@@ -58,7 +64,11 @@ class RiskService:
             risks = self.evaluate_all()
         if level:
             risks = [r for r in risks if r.risk_level.value.lower() == level.lower()]
-        return sorted(risks, key=lambda r: r.composite_score, reverse=True)
+        return sorted(
+            risks,
+            key=lambda r: (r.composite_score is not None, r.composite_score or 0.0),
+            reverse=True,
+        )
 
     def get_summary(self) -> dict:
         risks = self.list_risks()
@@ -68,6 +78,7 @@ class RiskService:
             "high_count": sum(1 for r in risks if r.risk_level == RiskLevel.HIGH),
             "medium_count": sum(1 for r in risks if r.risk_level == RiskLevel.MEDIUM),
             "low_count": sum(1 for r in risks if r.risk_level == RiskLevel.LOW),
+            "unknown_count": sum(1 for r in risks if r.risk_level == RiskLevel.UNKNOWN),
             "internet_exposed_count": sum(1 for r in risks if any("Internet-facing" in r_reason for r_reason in r.reasons)),
             "open_attack_paths_count": len([p for p in attack_path_service.list_paths() if p.status.value == "OPEN"])
         }

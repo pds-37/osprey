@@ -43,3 +43,4 @@ class AttackPath(BaseModel):
     confidence: float = Field(default=0.90, ge=0.0, le=1.0)
     status: AttackPathStatus = Field(default=AttackPathStatus.OPEN)
     recommended_remediation: str = Field("")
+    fixture: bool = Field(default=False, description="True only for an explicitly seeded demo path")

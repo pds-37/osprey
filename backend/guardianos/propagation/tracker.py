@@ -14,11 +14,43 @@ from guardianos.propagation.models import (
 
 def evaluate_patch_propagation(
     finding: VulnerabilityFinding,
-    component: Component
+    component: Component,
+    *,
+    include_demo_fixtures: bool = False,
 ) -> PatchPropagationRecord:
     """
     Evaluate the full propagation lifecycle from Upstream Fix down to Production Workload.
     """
+    if not include_demo_fixtures:
+        details = {
+            stage: StageDetail(
+                stage=stage,
+                status=StageStatus.COMPLETED if stage == PropagationStage.SECURITY_ADVISORY else StageStatus.UNKNOWN,
+                evidence=(
+                    f"Advisory {finding.vulnerability_id} reports fixed version {finding.fixed_version}."
+                    if stage == PropagationStage.SECURITY_ADVISORY and finding.fixed_version
+                    else "NOT OBSERVED: no evidence source is connected for this lifecycle stage."
+                ),
+                version_or_tag=finding.vulnerability_id if stage == PropagationStage.SECURITY_ADVISORY else None,
+            )
+            for stage in PropagationStage
+        }
+        return PatchPropagationRecord(
+            id=f"prop-{component.name}-{finding.vulnerability_id}",
+            component_name=component.name,
+            installed_purl=component.purl,
+            installed_version=component.version,
+            vulnerability_id=finding.vulnerability_id,
+            fixed_version=finding.fixed_version or "unknown",
+            application=component.application,
+            environment=component.environment,
+            stages=details,
+            bottleneck_stage=None,
+            is_production_exposed=None,
+            fixture=False,
+            summary_explanation="Propagation status is unknown because image rebuild and deployment observations are not configured.",
+        )
+
     fixed_ver = finding.fixed_version or "latest"
     is_running = (component.state == DependencyState.RUNNING)
 
@@ -120,5 +152,6 @@ def evaluate_patch_propagation(
         stages=stages_map,
         bottleneck_stage=bottleneck,
         is_production_exposed=is_exposed,
+        fixture=True,
         summary_explanation=summary_explanation
     )

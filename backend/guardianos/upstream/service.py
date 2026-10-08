@@ -1,14 +1,21 @@
 """Upstream change monitoring service coordinating detection and inventory impact."""
 
 from datetime import datetime, timezone
+import json
 from typing import Dict, List, Optional
 from guardianos.core.audit import record_audit_event
 from guardianos.graph.builder import get_graph_store
 from guardianos.inventory.service import inventory_service
 from guardianos.upstream.detector import analyze_commit_heuristics
 from guardianos.upstream.models import ChangeClassification, CommitRecord
+from guardianos.storage.evidence import evidence_store
+from osprey.core.models import EvidenceType
+from guardianos.storage.sqlite import state_store
 
-_commits_db: Dict[str, CommitRecord] = {}
+_commits_db: Dict[str, CommitRecord] = {
+    key: CommitRecord.model_validate(value)
+    for key, value in state_store.list("upstream_commits").items()
+}
 
 
 class UpstreamMonitorService:
@@ -16,7 +23,6 @@ class UpstreamMonitorService:
 
     def __init__(self) -> None:
         self.graph = get_graph_store()
-        self._seed_default_commits()
 
     def ingest_commit(
         self,
@@ -31,6 +37,14 @@ class UpstreamMonitorService:
     ) -> CommitRecord:
         files = files_changed or []
         classification, confidence, signals, reasoning = analyze_commit_heuristics(message, diff_summary)
+        evidence = evidence_store.add(
+            evidence_type=EvidenceType.USER_INPUT,
+            source="user-supplied commit metadata",
+            location=f"{repository}@{commit_sha}",
+            content=json.dumps({"message": message, "diff_summary": diff_summary, "files_changed": files}, sort_keys=True),
+            confidence=min(confidence, 0.5),
+            metadata={"repository": repository, "commit_sha": commit_sha, "heuristic_only": True},
+        )
 
         record = CommitRecord(
             id=commit_sha,
@@ -43,12 +57,14 @@ class UpstreamMonitorService:
             diff_summary=diff_summary,
             files_changed=files,
             classification=classification,
-            confidence=confidence,
+            confidence=min(confidence, 0.5),
             detected_signals=signals,
             reasoning=reasoning,
-            potential_fixed_version=potential_fixed_version
+            potential_fixed_version=potential_fixed_version,
+            evidence_ids=[evidence.id],
         )
         _commits_db[record.id] = record
+        state_store.put("upstream_commits", record.id, record)
 
         # Correlate in Knowledge Graph if suspicious or corroborated
         if classification == ChangeClassification.SUSPECTED_SECURITY_CHANGE:
@@ -101,22 +117,9 @@ class UpstreamMonitorService:
     def get_commit(self, sha: str) -> Optional[CommitRecord]:
         return _commits_db.get(sha)
 
-    def _seed_default_commits(self) -> None:
-        """Seed flagship libheif security commit demonstration."""
-        if "e31a196ec2b07d6b38c353b3df8d3dbb4cfae977" not in _commits_db:
-            self.ingest_commit(
-                repository="strukturag/libheif",
-                commit_sha="e31a196ec2b07d6b38c353b3df8d3dbb4cfae977",
-                component_name="libheif",
-                author="Dirk Farin <dirk.farin@gmail.com>",
-                message="Fix integer conversion in overlay calculation and add bounds check before memory allocation",
-                diff_summary="@@ -421,7 +421,8 @@ int parse_overlay(struct heif_image* img) {\n- uint32_t alloc_sz = (uint32_t)(w * h * bpp);\n+ if (w > MAX_DIM || h > MAX_DIM) return -1;\n+ size_t alloc_sz = safe_multiply(w, h, bpp);\n+ char* buf = malloc(alloc_sz);",
-                files_changed=["libheif/heif_image.cc", "libheif/box.cc"],
-                potential_fixed_version="1.19.8"
-            )
-
     def clear(self) -> None:
         _commits_db.clear()
+        state_store.clear("upstream_commits")
 
 
 upstream_service = UpstreamMonitorService()

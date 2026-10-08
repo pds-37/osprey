@@ -12,10 +12,112 @@ import {
 
 interface RemediationCenterProps {
   tasks: RemediationTask[];
-  onApprove: (taskId: string, actor: string) => Promise<void>;
+  onApprove: (taskId: string) => Promise<void>;
   onVerify: (taskId: string) => Promise<void>;
   onRefresh: () => void;
 }
+
+const renderInlineMarkdown = (text: string) => {
+  const parts: React.ReactNode[] = [];
+  const regex = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const token = match[0];
+    if (token.startsWith('**') && token.endsWith('**')) {
+      parts.push(
+        <strong key={match.index} className="text-white font-semibold">
+          {token.slice(2, -2)}
+        </strong>
+      );
+    } else if (token.startsWith('`') && token.endsWith('`')) {
+      parts.push(
+        <code
+          key={match.index}
+          className="px-1.5 py-0.5 rounded bg-neutral-900 text-emerald-400 font-mono text-[10.5px] border border-neutral-800"
+        >
+          {token.slice(1, -1)}
+        </code>
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return parts.length > 0 ? parts : text;
+};
+
+const renderFormattedBody = (body: string) => {
+  if (!body) return null;
+
+  const lines = body.split('\n');
+  const elements: React.ReactNode[] = [];
+  let currentList: React.ReactNode[] = [];
+
+  const flushList = () => {
+    if (currentList.length > 0) {
+      elements.push(
+        <div
+          key={`list-${elements.length}`}
+          className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2.5 rounded-lg bg-black border border-neutral-900 my-1.5"
+        >
+          {currentList}
+        </div>
+      );
+      currentList = [];
+    }
+  };
+
+  lines.forEach((rawLine, idx) => {
+    const line = rawLine.trim();
+    if (!line) return;
+
+    if (line.startsWith('## ')) {
+      flushList();
+      elements.push(
+        <div
+          key={`h2-${idx}`}
+          className="text-xs font-bold text-white tracking-tight flex items-center space-x-1.5 pb-1 border-b border-neutral-900 mt-1 mb-1.5"
+        >
+          <span>{line.replace(/^##\s+/, '')}</span>
+        </div>
+      );
+    } else if (line.startsWith('### ')) {
+      flushList();
+      elements.push(
+        <div
+          key={`h3-${idx}`}
+          className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 mt-2.5 mb-1"
+        >
+          <span>{line.replace(/^###\s+/, '')}</span>
+        </div>
+      );
+    } else if (line.startsWith('- ') || line.startsWith('* ')) {
+      const itemText = line.replace(/^[-\*]\s+/, '');
+      currentList.push(
+        <div key={`item-${idx}`} className="text-xs text-neutral-300 flex items-start space-x-1.5 py-0.5">
+          <span className="text-neutral-500 mt-0.5">•</span>
+          <span className="leading-snug">{renderInlineMarkdown(itemText)}</span>
+        </div>
+      );
+    } else {
+      flushList();
+      elements.push(
+        <p key={`p-${idx}`} className="text-xs text-neutral-300 leading-relaxed my-1">
+          {renderInlineMarkdown(line)}
+        </p>
+      );
+    }
+  });
+
+  flushList();
+  return <div className="space-y-1.5 text-xs py-1">{elements}</div>;
+};
 
 export const RemediationCenter: React.FC<RemediationCenterProps> = ({
   tasks,
@@ -23,13 +125,12 @@ export const RemediationCenter: React.FC<RemediationCenterProps> = ({
   onVerify,
   onRefresh,
 }) => {
-  const [approverName, setApproverName] = useState('secops-lead@guardian.internal');
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   const handleApprove = async (taskId: string) => {
     try {
       setProcessingId(taskId);
-      await onApprove(taskId, approverName);
+      await onApprove(taskId);
     } finally {
       setProcessingId(null);
     }
@@ -49,25 +150,17 @@ export const RemediationCenter: React.FC<RemediationCenterProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-white tracking-tight flex items-center space-x-2">
-            <span>Remediation & Human Approval Gate</span>
+            <span>Remediation Recommendations</span>
             <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-neutral-900 text-neutral-400 border border-neutral-800">
               Non-destructive
             </span>
           </h2>
           <p className="text-xs text-neutral-400 mt-0.5">
-            Strict human review for PR proposals prior to CI/CD build, deployment, and post-fix verification.
+            Recommendations only. Osprey does not edit repositories, create branches, or deploy changes.
           </p>
         </div>
 
         <div className="flex items-center space-x-2">
-          <input
-            type="text"
-            value={approverName}
-            onChange={(e) => setApproverName(e.target.value)}
-            placeholder="Approving Engineer"
-            className="px-2.5 py-1.5 rounded-md bg-neutral-950 border border-neutral-900 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-700 font-mono"
-            title="Approver identity recorded in immutable audit log"
-          />
           <button
             onClick={onRefresh}
             className="px-3 py-1.5 rounded-md text-xs font-medium bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-800 transition-all font-mono"
@@ -80,15 +173,16 @@ export const RemediationCenter: React.FC<RemediationCenterProps> = ({
       {tasks.length === 0 ? (
         <div className="border border-neutral-900 rounded-xl bg-neutral-950 p-12 text-center text-neutral-500">
           <ShieldCheck className="w-8 h-8 mx-auto mb-2 text-emerald-400 opacity-60" />
-          <p className="text-xs font-semibold text-white">All Dependencies Remediated</p>
-          <p className="text-[11px] text-neutral-400 mt-0.5">No open remediation tasks requiring human approval or verification.</p>
+          <p className="text-xs font-semibold text-white">No Recommendations Available</p>
+          <p className="text-[11px] text-neutral-400 mt-0.5">No remediation recommendations are available in the current records.</p>
         </div>
       ) : (
         <div className="space-y-4">
           {tasks.map((task) => {
             const pr = task.pull_request;
             const isApproved = task.status === 'APPROVED';
-            const isVerified = task.status === 'VERIFIED_CLOSED';
+            const isVerified = task.status === 'VERIFIED_CLOSED' || task.status === 'VERIFIED_RESOLVED';
+            const isUnverified = task.status === 'UNVERIFIED';
             const isPending = task.status === 'PENDING_APPROVAL';
 
             return (
@@ -110,6 +204,7 @@ export const RemediationCenter: React.FC<RemediationCenterProps> = ({
                         <GitPullRequest className="w-3.5 h-3.5" />
                       </div>
                       <h3 className="font-semibold text-xs text-white">{pr.title}</h3>
+                      {task.fixture && <span className="px-1.5 py-0.5 rounded border border-amber-900/60 text-[9px] font-mono text-amber-400">DEMO FIXTURE</span>}
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium border uppercase ${
                           isVerified
@@ -145,45 +240,45 @@ export const RemediationCenter: React.FC<RemediationCenterProps> = ({
                         className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-white hover:bg-neutral-200 text-black transition-all disabled:opacity-50"
                       >
                         <UserCheck className="w-3.5 h-3.5" />
-                        <span>{processingId === task.id ? 'Approving...' : 'Approve Pull Request'}</span>
+                        <span>{processingId === task.id ? 'Approving...' : 'Approve Recommendation'}</span>
                       </button>
                     )}
 
-                    {isApproved && (
+                    {(isApproved || isUnverified) && (
                       <button
                         onClick={() => handleVerify(task.id)}
                         disabled={processingId === task.id}
                         className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-neutral-100 hover:bg-neutral-300 text-black transition-all disabled:opacity-50"
                       >
                         <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>{processingId === task.id ? 'Verifying...' : 'Verify Rescan (Close Attack Path)'}</span>
+                        <span>{processingId === task.id ? 'Checking...' : isUnverified ? 'Check New Inventory' : 'Check Inventory'}</span>
                       </button>
                     )}
 
                     {isVerified && (
                       <div className="flex items-center space-x-1.5 text-[11px] font-mono text-emerald-400 bg-emerald-950/30 border border-emerald-900/50 px-2.5 py-1 rounded-md">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Remediated & Verified in Production</span>
+                        <span>{task.fixture ? 'Simulated fixture state' : 'Target version observed in inventory'}</span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Pull Request Details */}
+                {/* Recommendation Details */}
                 <div className="py-3 space-y-2.5">
-                  <p className="text-[11px] text-neutral-400 leading-relaxed">{pr.body}</p>
+                  {renderFormattedBody(pr.body)}
 
                   <div className="flex items-center space-x-3 text-[11px] font-mono text-neutral-400 bg-black p-2 rounded-md border border-neutral-900">
                     <span className="flex items-center space-x-1">
                       <FileCode className="w-3 h-3 text-neutral-500" />
-                      <span>Target: <strong className="text-neutral-200">{pr.target_file}</strong></span>
+                      <span>Repository change: <strong className="text-neutral-200">{pr.target_file || 'Not generated'}</strong></span>
                     </span>
                     <span>•</span>
-                    <span>Branch: <strong className="text-neutral-300">{pr.branch_name}</strong></span>
+                    <span>Branch: <strong className="text-neutral-300">{pr.branch_name || 'Not created'}</strong></span>
                   </div>
 
                   {/* Unified Diff Box */}
-                  <div className="rounded-lg overflow-hidden border border-neutral-900 bg-black">
+                  {pr.diff_content ? <div className="rounded-lg overflow-hidden border border-neutral-900 bg-black">
                     <div className="bg-neutral-950 px-3 py-1.5 border-b border-neutral-900 flex items-center justify-between text-xs text-neutral-400">
                       <span className="font-mono text-[10px] flex items-center space-x-1.5">
                         <Terminal className="w-3 h-3 text-neutral-500" />
@@ -208,7 +303,7 @@ export const RemediationCenter: React.FC<RemediationCenterProps> = ({
                         );
                       })}
                     </pre>
-                  </div>
+                  </div> : <div className="rounded-lg border border-neutral-900 bg-black p-3 text-xs text-neutral-400">No repository diff was generated. Apply the recommended version in the manifest or image build that supplies this component, then upload a fresh SBOM to check its status.</div>}
                 </div>
 
                 {/* Audit & Verification Log */}
@@ -224,7 +319,7 @@ export const RemediationCenter: React.FC<RemediationCenterProps> = ({
                       <>
                         <span>•</span>
                         <span className="text-emerald-400 font-medium">
-                          Rescan confirmed: Attack Path Closed
+                          A fresh inventory observation was checked
                         </span>
                       </>
                     )}

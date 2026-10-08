@@ -21,8 +21,7 @@ def test_remediation_api_approval_and_verification_flow(sample_spdx_json):
     client.post("/api/v1/sboms/upload", json={
         "content": json.loads(sample_spdx_json),
         "application": "image-service",
-        "environment": "production",
-        "state": "RUNNING"
+        "environment": "production"
     })
 
     # 2. Trigger vulnerability scan
@@ -31,7 +30,7 @@ def test_remediation_api_approval_and_verification_flow(sample_spdx_json):
     # 3. Recalculate attack paths
     path_resp = client.post("/api/v1/attack-paths/recalculate")
     assert path_resp.status_code == 200
-    assert len(path_resp.json()) >= 1
+    assert path_resp.json() == []
 
     # 4. Generate remediation tasks
     gen_resp = client.post("/api/v1/remediation/generate")
@@ -40,18 +39,19 @@ def test_remediation_api_approval_and_verification_flow(sample_spdx_json):
     assert len(tasks) >= 1
     task = tasks[0]
     assert task["status"] == "PENDING_APPROVAL"
-    assert "Dockerfile" in task["pull_request"]["target_file"]
+    assert task["pull_request"]["target_file"] is None
+    assert task["pull_request"]["diff_content"] is None
 
     # 5. Human approval gate
-    appr_resp = client.post(f"/api/v1/remediation/tasks/{task['id']}/approve", json={"actor": "priyanshu@secops"})
+    appr_resp = client.post(f"/api/v1/remediation/tasks/{task['id']}/approve")
     assert appr_resp.status_code == 200
     assert appr_resp.json()["status"] == "APPROVED"
-    assert appr_resp.json()["approval_actor"] == "priyanshu@secops"
+    assert appr_resp.json()["approval_actor"] == "test-admin"
 
     # 6. Post-deployment verification rescan
     ver_resp = client.post(f"/api/v1/remediation/tasks/{task['id']}/verify")
     assert ver_resp.status_code == 200
     ver_task = ver_resp.json()
-    assert ver_task["status"] == "VERIFIED_CLOSED"
-    assert ver_task["verification_evidence"]["attack_path_status"] == "CLOSED"
-    assert ver_task["verification_evidence"]["message"] == "Remediation verified. Attack path CLOSED."
+    assert ver_task["status"] == "UNVERIFIED"
+    assert ver_task["verification_evidence"]["attack_path_status"] == "NOT_OBSERVED"
+    assert "Upload a fresh SBOM" in ver_task["verification_evidence"]["message"]

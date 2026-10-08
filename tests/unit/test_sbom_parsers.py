@@ -9,7 +9,7 @@ def test_cyclonedx_parser(sample_cyclonedx_json):
         raw_content=sample_cyclonedx_json,
         application="media-service",
         environment="production",
-        default_state=DependencyState.RUNNING
+        default_state=DependencyState.UNKNOWN
     )
     assert result.format == SBOMFormat.CYCLONEDX
     assert result.components_count == 4  # 1 root app + 3 libraries
@@ -19,7 +19,7 @@ def test_cyclonedx_parser(sample_cyclonedx_json):
     # Check root application
     app_comp = next((c for c in result.components if c.name == "image-processing-service"), None)
     assert app_comp is not None
-    assert app_comp.state == DependencyState.RUNNING
+    assert app_comp.state == DependencyState.UNKNOWN
 
     # Check dependencies
     fastapi_comp = next((c for c in result.components if c.name == "fastapi"), None)
@@ -60,7 +60,7 @@ def test_syft_parser(sample_syft_json):
     container_comp = next((c for c in result.components if c.ecosystem == Ecosystem.DOCKER), None)
     assert container_comp is not None
     assert container_comp.name == "prod-media-processor:v1.2.0"
-    assert container_comp.state == DependencyState.RUNNING
+    assert container_comp.state == DependencyState.INSTALLED
 
 
 def test_format_auto_detection(sample_cyclonedx_json, sample_spdx_json, sample_syft_json):
@@ -68,3 +68,21 @@ def test_format_auto_detection(sample_cyclonedx_json, sample_spdx_json, sample_s
     assert detect_sbom_format(json.loads(sample_cyclonedx_json)) == SBOMFormat.CYCLONEDX
     assert detect_sbom_format(json.loads(sample_spdx_json)) == SBOMFormat.SPDX
     assert detect_sbom_format(json.loads(sample_syft_json)) == SBOMFormat.SYFT
+
+
+def test_sbom_cannot_claim_runtime_state(sample_cyclonedx_json):
+    import json
+    import pytest
+
+    with pytest.raises(ValueError, match="cannot establish.*running"):
+        parse_sbom(
+            raw_content=sample_cyclonedx_json,
+            application="media-service",
+            default_state=DependencyState.RUNNING,
+        )
+
+    data = json.loads(sample_cyclonedx_json)
+    data["components"][0]["properties"] = [{"name": "osprey:observation_state", "value": "RUNNING"}]
+    parsed = parse_sbom(data, application="media-service", default_state=DependencyState.UNKNOWN)
+    assert parsed.components[0].state == DependencyState.UNKNOWN
+    assert parsed.components[0].running_version is None

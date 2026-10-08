@@ -1,9 +1,11 @@
 """Audit Log API endpoints."""
 
-from fastapi import APIRouter, Query
+from fastapi import Depends, Query
+from guardianos.api.security import SecuredAPIRouter
+from guardianos.core.security import require_single_organization
 from guardianos.core.audit import AuditEvent, get_recent_audit_events
 
-router = APIRouter(prefix="/audit", tags=["Audit Logs"])
+router = SecuredAPIRouter(prefix="/audit", tags=["Audit Logs"], dependencies=[Depends(require_single_organization)])
 
 
 @router.get("/events", response_model=list[AuditEvent])

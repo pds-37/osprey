@@ -1,4 +1,4 @@
-"""End-to-End Test for the GuardianOS Flagship Demonstration Scenario."""
+"""Tests for the explicitly synthetic Osprey demo fixture scenario."""
 
 from guardianos.demo.scenario import run_flagship_demo
 
@@ -6,8 +6,11 @@ from guardianos.demo.scenario import run_flagship_demo
 def test_flagship_demo_end_to_end():
     result = run_flagship_demo()
 
-    assert result["status"] == "DEMO_COMPLETED_SUCCESSFULLY"
-    assert result["remediation_verified"] is True
+    assert result["status"] == "DEMO_FIXTURE_COMPLETED"
+    assert result["fixture"] is True
+    assert result["evidence_status"] == "SIMULATED_FIXTURE_DATA_NOT_LIVE_OBSERVATIONS"
+    assert result["remediation_verified"] is False
+    assert result["simulated_fixture_verification"] is True
     assert result["attack_path_status"] == "CLOSED"
 
     timeline = result["timeline"]
@@ -41,11 +44,12 @@ def test_flagship_demo_end_to_end():
 
     # Step 7: Risk
     assert timeline[6]["step"] == 7
-    assert timeline[6]["risk_level"] == "CRITICAL"
+    assert timeline[6]["risk_level"] == "UNKNOWN"
+    assert timeline[6]["composite_score"] is None
 
     # Step 8: AI Analyst
     assert timeline[7]["step"] == 8
-    assert len(timeline[7]["evidence_citations"]) >= 3
+    assert len(timeline[7]["evidence_citations"]) >= 2
 
     # Step 9: Remediation generated
     assert timeline[8]["step"] == 9
@@ -58,4 +62,4 @@ def test_flagship_demo_end_to_end():
     # Step 11: Verified & Closed
     assert timeline[10]["step"] == 11
     assert timeline[10]["attack_path_status"] == "CLOSED"
-    assert "Remediation verified. Attack path CLOSED." in timeline[10]["verification_message"]
+    assert "SIMULATED FIXTURE ONLY" in timeline[10]["verification_message"]

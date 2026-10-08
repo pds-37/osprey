@@ -16,7 +16,7 @@ from guardianos.inventory.normalizer import build_canonical_purl, normalize_ecos
 def parse_syft(
     data: Dict[str, Any],
     application: str = "default-app",
-    environment: str = "production",
+    environment: str = "unknown",
     default_state: DependencyState = DependencyState.INSTALLED
 ) -> IngestionResult:
     sbom_id = str(data.get("id", f"syft-{uuid.uuid4()}"))
@@ -44,7 +44,7 @@ def parse_syft(
                 purl=root_purl,
                 environment=environment,
                 application=application,
-                state=DependencyState.RUNNING if environment == "production" else default_state,
+                state=DependencyState.INSTALLED,
                 properties={"source_type": target_type, "is_root_container": True}
             )
         )

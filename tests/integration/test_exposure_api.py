@@ -16,20 +16,21 @@ def test_exposure_api_flow(sample_spdx_json):
         "content": json.loads(sample_spdx_json),
         "application": "image-service",
         "environment": "production",
-        "state": "RUNNING"
+        "state": "UNKNOWN"
     })
 
     # Query endpoints
     eps_resp = client.get("/api/v1/exposure/endpoints")
     assert eps_resp.status_code == 200
     eps = eps_resp.json()
-    assert len(eps) >= 1
+    assert eps == []
 
     # Query exposure profile for libheif
     prof_resp = client.get("/api/v1/exposure/libheif")
     assert prof_resp.status_code == 200
     prof = prof_resp.json()
     assert prof["component_name"] == "libheif"
-    assert prof["network_exposure"] == "INTERNET_FACING"
-    assert prof["auth_requirement"] == "NONE"
+    assert prof["network_exposure"] == "UNKNOWN"
+    assert prof["auth_requirement"] == "UNKNOWN"
     assert len(prof["reasons"]) >= 2
+    assert any("NOT OBSERVED" in reason for reason in prof["reasons"])

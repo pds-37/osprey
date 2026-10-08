@@ -1,3 +1,3 @@
-"""GuardianOS v2 - AI-native Supply Chain Intelligence & Attack Path Platform."""
+"""Osprey API and dashboard adapter for evidence-driven supply-chain analysis."""
 
 __version__ = "2.0.0"

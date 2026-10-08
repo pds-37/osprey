@@ -1,30 +1,20 @@
-# GuardianOS v2 — Attack Path Engine Specification
+# Attack Path Analysis: Current Scope
 
-## Graph Traversal Architecture
-The Attack Path Engine discovers whether an adversary can reach a high-value asset, cloud credential, or sensitive database from an external entry point.
+Osprey does not currently discover cloud identities, IAM permissions, Kubernetes service accounts, deployed workloads, or cloud storage. A source route declaration or a high-severity package finding is not enough to construct an attack path.
 
-```mermaid
-flowchart LR
-    A[Attacker / Internet] -->|Public HTTP| B[POST /api/upload]
-    B -->|Routes To| C[Image Service]
-    C -->|Invokes| D[ImageMagick]
-    D -->|Executes Code In| E[libheif Vulnerable 1.19.7]
-    E -->|Remote Code Execution| F[Container Filesystem]
-    F -->|Escalates Via| G[IAM Service Account]
-    G -->|Extracts Data From| H[S3 Customer Bucket]
-```
+The normal backend attack-path service therefore returns no cloud attack path unless the supported analysis has relevant explicit evidence. The optional flagship demo seeds fictional Internet, endpoint, identity, and S3 nodes and is labeled simulated. Those fixture nodes are not reusable production facts.
 
-## Traversal Node Taxonomy
-1. **Entry Points**: `Internet`, `PublicRoute`, `Webhook`, `LeakedCredential`.
-2. **Execution Nodes**: `Service`, `Container`, `Library`, `RuntimeProcess`.
-3. **Privilege Transitions**: `ServiceAccount`, `RoleBinding`, `HostMount`.
-4. **Target Assets**: `CloudResource`, `Database`, `AgentSecret`, `ProductionRepository`.
+## What can be established now
 
-## Path Calculation Logic
-- Breadth-First and Depth-First Search with cycle detection up to depth $K$.
-- Every discovered path must include:
-  - `entry_point`: External entry vector.
-  - `vulnerable_node`: PURL of the vulnerable library.
-  - `privilege_transition`: Service account or IAM role.
-  - `target_asset`: High-value resource reached.
-  - `confidence_score`: Deterministic confidence based on evidence signals.
+- A static HTTP route declaration in supported source syntax, with file and line.
+- A local call path from an observed handler to a call to an advisory-mapped symbol, when all relevant functions are in the submitted source bundle and syntax is supported.
+- A user-supplied endpoint profile, labeled as a user assertion with evidence.
+
+## What remains unknown
+
+- Whether a route is reachable from the public internet.
+- Authentication and gateway enforcement unless separately supplied as an assertion.
+- Whether a component or process is deployed/running.
+- Whether the process has cloud credentials, what those credentials can access, or whether an exploit succeeds.
+
+Future attack-path edges must carry source evidence and confidence. Missing hops should remain unknown rather than being filled from a demo topology.

@@ -1,0 +1,6 @@
+{
+  "name": "osprey-phase10-synthetic-demo",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": { "demo-codec": "^1.0.0" }
+}

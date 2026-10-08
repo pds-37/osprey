@@ -1,27 +1,29 @@
 """Flagship Demo API endpoints."""
 
-from fastapi import APIRouter, status
+from fastapi import status
+from fastapi import Depends
+from guardianos.api.security import SecuredAPIRouter
+from guardianos.core.security import require_single_organization
+from guardianos.core.config import settings
+from guardianos.core.security import UserRole, require_role
 from guardianos.demo.scenario import run_flagship_demo
 
-router = APIRouter(prefix="/demo", tags=["Flagship Demo"])
+router = SecuredAPIRouter(prefix="/demo", tags=["Demo Fixtures"], dependencies=[Depends(require_single_organization)])
 
 
-@router.post("/run", status_code=status.HTTP_200_OK)
+@router.post("/run", status_code=status.HTTP_200_OK, dependencies=[Depends(require_role(UserRole.ADMIN))])
 async def execute_demo_scenario():
-    """Trigger complete end-to-end GuardianOS v2 supply chain & attack path demonstration."""
+    """Run synthetic fixture data; this is not a live repository or runtime assessment."""
     result = run_flagship_demo()
     return result
 
 
 @router.get("/status")
 async def get_demo_status():
-    """Get status overview of the flagship demo scenario."""
+    """Describe the optional synthetic fixture scenario without presenting it as observed state."""
     return {
-        "scenario_name": "libheif / ImageMagick Supply Chain & Attack Path Walkthrough",
-        "entry_point": "Internet -> POST /upload (Unauthenticated)",
-        "affected_component": "libheif 1.19.7 via ImageMagick",
-        "vulnerability": "CVE-2023-44398 (Heap buffer overflow RCE, CVSS 9.8)",
-        "target_cloud_resource": "s3://customer-media-production",
-        "remediation": "Upgrade libheif to 1.19.8 in container base image",
-        "verification_result": "Attack Path CLOSED"
+        "scenario_name": "Synthetic libheif / ImageMagick fixture",
+        "fixture": True,
+        "enabled": settings.ENABLE_DEMO_FIXTURES,
+        "warning": "Values in this scenario are seeded demo data, not repository, cloud, deployment, or runtime observations.",
     }

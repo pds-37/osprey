@@ -19,8 +19,7 @@ def test_patch_propagation_api_flow(sample_spdx_json):
     client.post("/api/v1/sboms/upload", json={
         "content": json.loads(sample_spdx_json),
         "application": "media-processor",
-        "environment": "production",
-        "state": "RUNNING"
+        "environment": "production"
     })
 
     # Trigger vulnerability scan
@@ -34,5 +33,6 @@ def test_patch_propagation_api_flow(sample_spdx_json):
 
     libheif_rec = next((r for r in records if r["component_name"] == "libheif"), None)
     assert libheif_rec is not None
-    assert libheif_rec["is_production_exposed"] is True
-    assert "The upstream fix exists" in libheif_rec["summary_explanation"]
+    assert libheif_rec["is_production_exposed"] is None
+    assert libheif_rec["bottleneck_stage"] is None
+    assert "status is unknown" in libheif_rec["summary_explanation"]

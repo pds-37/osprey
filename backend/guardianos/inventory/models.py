@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
+import uuid
 from pydantic import BaseModel, Field
 
 
@@ -19,7 +20,9 @@ class Ecosystem(str, Enum):
 
 
 class DependencyState(str, Enum):
+    UNKNOWN = "UNKNOWN"      # No source proves declared, installed, or running state
     DECLARED = "DECLARED"    # Defined in manifest/lockfile (e.g., package.json, requirements.txt)
+    LOCKED = "LOCKED"        # Resolved version recorded by a lockfile; installation is not implied
     INSTALLED = "INSTALLED"  # Installed in filesystem or container image (e.g. node_modules, /usr/lib)
     RUNNING = "RUNNING"      # Actively running in memory/production workload
 
@@ -37,14 +40,23 @@ class Component(BaseModel):
     ecosystem: Ecosystem = Field(default=Ecosystem.GENERIC, description="Package ecosystem")
     version: str = Field(..., description="Installed or declared version")
     purl: str = Field(..., description="Package URL standard identifier")
+    observation_id: str = Field(default_factory=lambda: uuid.uuid4().hex, description="Unique inventory observation ID")
     source: Optional[str] = Field(None, description="Origin repository or package registry")
+    location: Optional[str] = Field(None, description="Manifest, lockfile, SBOM, image, or runtime source location")
+    dependency_type: str = Field("unknown", description="direct, transitive, os, or unknown")
+    declared_version: Optional[str] = None
+    locked_version: Optional[str] = None
+    installed_version: Optional[str] = None
+    running_version: Optional[str] = None
+    evidence_ids: list[str] = Field(default_factory=list)
     checksum: Optional[str] = Field(None, description="SHA256 or package digest")
     parent_purls: list[str] = Field(default_factory=list, description="Immediate parents in dependency tree")
-    environment: str = Field(default="production", description="Environment: production, staging, development")
+    environment: str = Field(default="unknown", description="User-provided environment label; not runtime evidence")
     application: str = Field(default="default-app", description="Owning application")
+    organization_id: str = Field(default="default-org", max_length=128, description="Owning authenticated organization")
     deployment: Optional[str] = Field(None, description="Associated workload or container deployment")
     owner: Optional[str] = Field(None, description="Owning team or engineer")
-    state: DependencyState = Field(default=DependencyState.INSTALLED, description="Declared, Installed, or Running")
+    state: DependencyState = Field(default=DependencyState.UNKNOWN, description="Observation state; RUNNING requires runtime evidence")
     first_seen: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     last_seen: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     licenses: list[str] = Field(default_factory=list)
@@ -64,7 +76,8 @@ class SBOMDocument(BaseModel):
     format: SBOMFormat = Field(..., description="Detected format (CycloneDX, SPDX, Syft)")
     spec_version: str = Field("unknown", description="Format specification version")
     application: str = Field("default-app", description="Target application name")
-    environment: str = Field("production", description="Deployment environment")
+    organization_id: str = Field(default="default-org", max_length=128)
+    environment: str = Field("unknown", description="User-provided environment label; not runtime evidence")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     component_count: int = Field(default=0)
     raw_metadata: dict[str, Any] = Field(default_factory=dict)

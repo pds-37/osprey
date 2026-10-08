@@ -12,10 +12,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install the shared Osprey core consumed by the API and CLI.
+COPY osprey/ /app/osprey/
+
 # Copy backend code
 COPY backend/ /app/backend/
 
-ENV PYTHONPATH=/app/backend
+ENV PYTHONPATH=/app/backend:/app/osprey/src
 
 EXPOSE 8000
 

@@ -16,6 +16,7 @@ class PropagationStage(str, Enum):
 
 
 class StageStatus(str, Enum):
+    UNKNOWN = "UNKNOWN"
     COMPLETED = "COMPLETED"
     PENDING = "PENDING"
     BLOCKED = "BLOCKED"
@@ -40,7 +41,8 @@ class PatchPropagationRecord(BaseModel):
     application: str
     environment: str
     stages: Dict[PropagationStage, StageDetail]
-    bottleneck_stage: PropagationStage
-    is_production_exposed: bool
+    bottleneck_stage: Optional[PropagationStage] = None
+    is_production_exposed: Optional[bool] = None
+    fixture: bool = Field(default=False, description="True only when lifecycle stages were explicitly seeded for the demo")
     summary_explanation: str
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

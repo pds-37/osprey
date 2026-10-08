@@ -33,9 +33,10 @@ def test_evaluate_patch_propagation_libheif():
     record = evaluate_patch_propagation(finding, comp)
 
     assert record.component_name == "libheif"
-    assert record.is_production_exposed is True
-    assert record.bottleneck_stage == PropagationStage.BASE_IMAGE_REBUILD
-    assert record.stages[PropagationStage.UPSTREAM_FIX].status == StageStatus.COMPLETED
-    assert record.stages[PropagationStage.DISTRIBUTION_PACKAGE].status == StageStatus.COMPLETED
-    assert record.stages[PropagationStage.BASE_IMAGE_REBUILD].status == StageStatus.PENDING
-    assert "The upstream fix exists (1.19.8), but production remains exposed" in record.summary_explanation
+    assert record.is_production_exposed is None
+    assert record.bottleneck_stage is None
+    assert record.stages[PropagationStage.UPSTREAM_FIX].status == StageStatus.UNKNOWN
+    assert record.stages[PropagationStage.SECURITY_ADVISORY].status == StageStatus.COMPLETED
+    assert record.stages[PropagationStage.DISTRIBUTION_PACKAGE].status == StageStatus.UNKNOWN
+    assert record.stages[PropagationStage.BASE_IMAGE_REBUILD].status == StageStatus.UNKNOWN
+    assert "status is unknown" in record.summary_explanation

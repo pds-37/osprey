@@ -30,3 +30,4 @@ class CommitRecord(BaseModel):
     detected_signals: List[str] = Field(default_factory=list)
     reasoning: str = Field("")
     potential_fixed_version: Optional[str] = None
+    evidence_ids: List[str] = Field(default_factory=list)

@@ -1,9 +1,9 @@
 import unittest
-import asyncio
 from unittest.mock import patch, MagicMock
+from pathlib import Path
 from guardianos.intel.osv_client import query_live_osv
 from guardianos.inventory.models import Ecosystem
-from guardianos.api.v1.sboms import scan_local_workspace
+from guardianos.inventory.scanner import scan_directory_manifests
 
 
 class TestOsvAndManifestScanner(unittest.TestCase):
@@ -21,8 +21,8 @@ class TestOsvAndManifestScanner(unittest.TestCase):
 
     def test_scan_local_workspace_manifests(self):
         # Should scan real workspace manifests
-        res = asyncio.run(scan_local_workspace())
+        res, manifests = scan_directory_manifests(Path.cwd(), app_name="osprey-test")
         self.assertIsNotNone(res.sbom_id)
         self.assertGreater(res.components_count, 0)
-        self.assertGreater(res.relationships_count, 0)
         self.assertTrue(len(res.application) > 0)
+        self.assertGreater(len(manifests), 0)

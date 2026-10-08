@@ -123,7 +123,7 @@ const SAMPLE_SYFT = {
 
 export const SbomUploadModal: React.FC<SbomUploadModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [app, setApp] = useState('media-upload-service');
-  const [env, setEnv] = useState('production');
+  const [env, setEnv] = useState('unknown');
   const [state, setState] = useState('INSTALLED');
   const [jsonText, setJsonText] = useState(JSON.stringify(SAMPLE_CYCLONEDX, null, 2));
   const [loading, setLoading] = useState(false);
@@ -180,8 +180,8 @@ export const SbomUploadModal: React.FC<SbomUploadModalProps> = ({ isOpen, onClos
                 <Sparkles className="w-3.5 h-3.5 text-neutral-300" />
               </div>
               <div>
-                <p className="text-xs font-medium text-white">Live Workspace Manifest Scanner</p>
-                <p className="text-[11px] text-neutral-400">Scan actual <span className="font-mono text-neutral-300">frontend/package.json</span> and ingest into Knowledge Graph</p>
+                <p className="text-xs font-medium text-white">Static Workspace Manifest Scanner</p>
+                <p className="text-[11px] text-neutral-400">Scan supported manifest and lockfiles under the configured workspace root.</p>
               </div>
             </div>
             <button
@@ -202,7 +202,7 @@ export const SbomUploadModal: React.FC<SbomUploadModalProps> = ({ isOpen, onClos
               }}
               className="px-3 py-1.5 bg-neutral-100 hover:bg-white text-black font-semibold text-xs rounded transition-colors disabled:opacity-50 flex items-center space-x-1.5"
             >
-              <span>{loading ? 'Scanning...' : 'Scan Local Repo'}</span>
+                  <span>{loading ? 'Scanning...' : 'Scan Workspace'}</span>
             </button>
           </div>
 
@@ -231,6 +231,7 @@ export const SbomUploadModal: React.FC<SbomUploadModalProps> = ({ isOpen, onClos
                 onChange={(e) => setEnv(e.target.value)}
                 className="w-full bg-black border border-neutral-900 rounded-md px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-neutral-700 font-mono"
               >
+                <option value="unknown">Unknown / not labeled</option>
                 <option value="production">Production</option>
                 <option value="staging">Staging</option>
                 <option value="development">Development</option>
@@ -243,8 +244,7 @@ export const SbomUploadModal: React.FC<SbomUploadModalProps> = ({ isOpen, onClos
                 onChange={(e) => setState(e.target.value)}
                 className="w-full bg-black border border-neutral-900 rounded-md px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-neutral-700 font-mono"
               >
-                <option value="INSTALLED">INSTALLED (Container/OS)</option>
-                <option value="RUNNING">RUNNING (Live Workload)</option>
+                <option value="INSTALLED">INSTALLED (SBOM contents)</option>
                 <option value="DECLARED">DECLARED (Manifest/Lockfile)</option>
               </select>
             </div>
@@ -277,6 +277,7 @@ export const SbomUploadModal: React.FC<SbomUploadModalProps> = ({ isOpen, onClos
                 </button>
               </div>
             </div>
+            <p className="mb-1 text-[10px] text-neutral-500">Sample buttons load synthetic example documents. Review the source and scope before ingesting any SBOM.</p>
             <textarea
               value={jsonText}
               onChange={(e) => setJsonText(e.target.value)}

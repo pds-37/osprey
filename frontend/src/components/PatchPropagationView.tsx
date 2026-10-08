@@ -47,13 +47,13 @@ export const PatchPropagationView: React.FC<PatchPropagationViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-white tracking-tight flex items-center space-x-2">
-            <span>Patch Propagation Lifecycle</span>
+            <span>Patch Lifecycle Observations</span>
             <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-neutral-900 text-neutral-400 border border-neutral-800">
-              6 Stages
+              6 Stages · Unknown unless observed
             </span>
           </h2>
           <p className="text-xs text-neutral-400 mt-0.5">
-            Understanding why "Upstream has fixed the vulnerability" does NOT mean "Production is safe."
+            A fixed version may be known while runtime, image rebuild, and deployment stages remain unobserved.
           </p>
         </div>
         <button
@@ -70,7 +70,7 @@ export const PatchPropagationView: React.FC<PatchPropagationViewProps> = ({
           <ShieldCheck className="w-8 h-8 mx-auto mb-2 text-emerald-400 opacity-60" />
           <p className="text-xs font-semibold text-white">No Propagation Records</p>
           <p className="text-[11px] text-neutral-400 mt-0.5">
-            No known vulnerable components currently tracking upstream propagation.
+            No vulnerability finding is available in the current analysis state.
           </p>
         </div>
       ) : (
@@ -90,6 +90,7 @@ export const PatchPropagationView: React.FC<PatchPropagationViewProps> = ({
                   <div className="space-y-0.5">
                     <div className="flex items-center space-x-2">
                       <span className="font-semibold text-sm text-white font-mono">{rec.component_name}</span>
+                      {rec.fixture && <span className="px-1.5 py-0.5 rounded border border-amber-900/60 text-[9px] font-mono text-amber-400">DEMO FIXTURE</span>}
                       <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-neutral-900 text-neutral-300 border border-neutral-800">
                         Installed: {rec.installed_version}
                       </span>
@@ -111,17 +112,19 @@ export const PatchPropagationView: React.FC<PatchPropagationViewProps> = ({
                     <div className="text-right">
                       <div className="text-[9px] uppercase font-mono text-neutral-400">Bottleneck</div>
                       <span className="text-xs font-mono font-medium text-amber-400">
-                        {STAGE_LABELS[rec.bottleneck_stage] || rec.bottleneck_stage}
+                        {rec.bottleneck_stage ? STAGE_LABELS[rec.bottleneck_stage] || rec.bottleneck_stage : 'NOT OBSERVED'}
                       </span>
                     </div>
                     <span
                       className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-medium border ${
-                        rec.is_production_exposed
+                        rec.is_production_exposed === true
                           ? 'bg-red-950/40 text-red-400 border-red-900/60'
-                          : 'bg-emerald-950/40 text-emerald-400 border-emerald-900/60'
+                          : rec.is_production_exposed === false
+                          ? 'bg-emerald-950/40 text-emerald-400 border-emerald-900/60'
+                          : 'bg-neutral-900 text-neutral-400 border-neutral-800'
                       }`}
                     >
-                      {rec.is_production_exposed ? 'PRODUCTION EXPOSED' : 'PRODUCTION SECURED'}
+                      {rec.fixture ? 'SIMULATED FIXTURE STATE' : rec.is_production_exposed === true ? 'RUNNING VULNERABLE VERSION FLAGGED' : rec.is_production_exposed === false ? 'NO EXPOSED RUNTIME FLAG' : 'RUNTIME NOT OBSERVED'}
                     </span>
                   </div>
                 </div>
@@ -132,8 +135,8 @@ export const PatchPropagationView: React.FC<PatchPropagationViewProps> = ({
                     {STAGE_ORDER.map((stageKey, idx) => {
                       const stageData = rec.stages[stageKey] || {
                         stage: stageKey,
-                        status: 'PENDING',
-                        evidence: 'Awaiting upstream update',
+                        status: 'UNKNOWN',
+                        evidence: 'NOT OBSERVED: no source is connected for this stage.',
                       };
                       const isCompleted = stageData.status === 'COMPLETED' || stageData.status === 'FIXED' || stageData.status === 'RELEASED';
                       const isBottleneck = rec.bottleneck_stage === stageKey;
@@ -210,13 +213,13 @@ export const PatchPropagationView: React.FC<PatchPropagationViewProps> = ({
                       className="px-2.5 py-1 rounded-md text-xs font-medium bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-800 flex items-center space-x-1.5 transition-all"
                     >
                       <Sparkles className="w-3 h-3 text-neutral-400" />
-                      <span>Ask AI Analyst</span>
+                      <span>View Evidence Summary</span>
                     </button>
                     <button
                       onClick={onOpenRemediation}
                       className="px-2.5 py-1 rounded-md text-xs font-semibold bg-white hover:bg-neutral-200 text-black transition-all"
                     >
-                      <span>Fix in Dockerfile</span>
+                      <span>View Recommendation</span>
                     </button>
                   </div>
                 </div>

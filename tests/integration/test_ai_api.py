@@ -1,4 +1,4 @@
-"""Integration tests for AI Security Analyst API."""
+"""Integration tests for the deterministic evidence summary API."""
 
 import json
 from fastapi.testclient import TestClient
@@ -15,8 +15,7 @@ def test_ai_analyze_api(sample_spdx_json):
     client.post("/api/v1/sboms/upload", json={
         "content": json.loads(sample_spdx_json),
         "application": "media-processor",
-        "environment": "production",
-        "state": "RUNNING"
+        "environment": "production"
     })
 
     # Trigger scan
@@ -30,10 +29,14 @@ def test_ai_analyze_api(sample_spdx_json):
     assert resp.status_code == 200
     report = resp.json()
     assert report["target_component"] == "libheif"
-    assert "POST /upload" in report["exposure_verdict"]
-    assert len(report["evidence_citations"]) >= 3
+    assert report["exposure_verdict"].startswith("UNKNOWN")
+    assert report["attack_path_summary"].startswith("NOT OBSERVED")
+    assert report["analysis_mode"] == "DETERMINISTIC_EVIDENCE_SUMMARY"
+    assert len(report["evidence_citations"]) >= 2
+    assert report["evidence_ids"]
+    assert all(evidence_id in " ".join(report["evidence_citations"]) for evidence_id in report["evidence_ids"])
 
     # Explain endpoint
     explain_resp = client.get("/api/v1/ai/explain/libheif")
     assert explain_resp.status_code == 200
-    assert "Upgrade" in explain_resp.json()["remediation_recommendation"]
+    assert "upgrade" in explain_resp.json()["remediation_recommendation"].lower()

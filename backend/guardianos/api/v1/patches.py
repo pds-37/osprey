@@ -1,11 +1,13 @@
 """Patch Propagation API endpoints."""
 
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import Depends, HTTPException, Query, status
 from guardianos.propagation.models import PatchPropagationRecord
 from guardianos.propagation.service import propagation_service
+from guardianos.api.security import SecuredAPIRouter
+from guardianos.core.security import require_single_organization
 
-router = APIRouter(prefix="/patches", tags=["Patch Propagation"])
+router = SecuredAPIRouter(prefix="/patches", tags=["Patch Propagation"], dependencies=[Depends(require_single_organization)])
 
 
 @router.get("/propagation", response_model=List[PatchPropagationRecord])

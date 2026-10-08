@@ -1,16 +1,15 @@
-"""Evidence-grounded AI Security Analyst with tool invocation and injection safeguards."""
+"""Evidence summary service; generated text cannot create findings or evidence."""
 
-from typing import Any, Dict, List
+from typing import List
+
 from pydantic import BaseModel, Field
-from guardianos.ai.tools import (
-    tool_get_attack_paths,
-    tool_get_component_lineage,
-    tool_get_patch_propagation,
-    tool_get_runtime_exposure,
-    tool_get_upstream_changes,
-    tool_get_vulnerability_intel,
-    tool_semantic_advisories_search,
-)
+
+from guardianos.attackpath.service import attack_path_service
+from guardianos.exposure.models import AuthRequirement, NetworkExposure
+from guardianos.exposure.service import exposure_service
+from guardianos.intel.service import intel_service
+from guardianos.inventory.service import inventory_service
+from guardianos.upstream.service import upstream_service
 
 
 class AIAnalysisReport(BaseModel):
@@ -23,128 +22,116 @@ class AIAnalysisReport(BaseModel):
     upstream_change_summary: str
     remediation_recommendation: str
     evidence_citations: List[str] = Field(default_factory=list)
-    confidence_score: float = Field(default=0.95, ge=0.0, le=1.0)
+    evidence_ids: List[str] = Field(default_factory=list)
+    analysis_mode: str = "DETERMINISTIC_EVIDENCE_SUMMARY"
 
 
 class AISecurityAnalyst:
-    """Enterprise AI Security Analyst providing evidence-grounded threat synthesis."""
-
-    def sanitize_untrusted_input(self, text: str) -> str:
-        """Strip dangerous prompt-injection markers from external advisories or inputs."""
-        sanitized = text.replace("<script>", "").replace("</script>", "")
-        # Neutralize common LLM prompt override instructions
-        sanitized = sanitized.replace("IGNORE PREVIOUS INSTRUCTIONS", "[REDACTED_PROMPT_INJECTION]")
-        sanitized = sanitized.replace("SYSTEM PROMPT OVERRIDE", "[REDACTED_PROMPT_INJECTION]")
-        return sanitized.strip()
+    """Summarize existing deterministic records without inventing evidence."""
 
     def analyze_component(self, component_name: str, user_question: str = "") -> AIAnalysisReport:
-        """
-        Conduct deep evidence-backed investigation across all subsystems.
-        """
-        clean_name = self.sanitize_untrusted_input(component_name)
-        
-        # 1. Deterministic Tool Calls
-        lineage_data = tool_get_component_lineage(clean_name)
-        exposure_data = tool_get_runtime_exposure(clean_name)
-        paths_data = tool_get_attack_paths(clean_name)
-        upstream_data = tool_get_upstream_changes(clean_name)
-        propagation_data = tool_get_patch_propagation(clean_name)
-
-        # Extract evidence citations
-        citations: List[str] = []
-        comp_info = lineage_data.get("component", {})
-        comp_version = comp_info.get("version", "unknown")
-        comp_purl = comp_info.get("purl", f"pkg:generic/{clean_name}")
-        citations.append(f"Component PURL: {comp_purl}")
-
-        vuln_id = "CVE-2023-44398" if clean_name == "libheif" else "CVE-KNOWN"
-        vuln_intel = tool_get_vulnerability_intel(vuln_id)
-        if "id" in vuln_intel:
-            citations.append(f"Advisory ID: {vuln_intel['id']} (CVSS: {vuln_intel.get('cvss_score', 'N/A')})")
-
-        fixed_ver = vuln_intel.get("fixed_versions", ["patched"])[0] if "fixed_versions" in vuln_intel else "latest"
-
-        # 2. Transitive Lineage Analysis
-        lineage_explanation = (
-            f"The component '{clean_name} {comp_version}' was not directly installed by the application author. "
-            f"It was brought into the environment transitively: Application Workload '{comp_info.get('application', 'app')}' "
-            f"-> Container Image -> Debian Distribution Package -> ImageMagick -> {clean_name}."
+        name = component_name.strip()
+        component = next(
+            (item for item in inventory_service.list_components(search=name, limit=1000)
+             if item.name.lower() == name.lower() or item.purl.lower() == name.lower()),
+            None,
         )
+        if component is None:
+            return AIAnalysisReport(
+                query=user_question,
+                target_component=name,
+                executive_summary="No matching component observation exists in the current inventory.",
+                lineage_explanation="NOT OBSERVED: component lineage is unavailable without an inventory observation.",
+                exposure_verdict="UNKNOWN: no component or endpoint observation is available.",
+                attack_path_summary="NOT OBSERVED: no verified attack path is available.",
+                upstream_change_summary="NOT OBSERVED: no upstream change record is available.",
+                remediation_recommendation="Upload an inventory artifact and run vulnerability analysis before making a remediation decision.",
+            )
 
-        # 3. Exposure Verdict
-        has_internet = exposure_data.get("network_exposure") == "INTERNET_FACING"
-        unauth = exposure_data.get("auth_requirement") == "NONE"
-        endpoints = exposure_data.get("endpoints", [])
-        ep_path = endpoints[0]["path"] if endpoints else "POST /upload"
-        citations.append(f"Ingress Route: {ep_path} (Public: {has_internet}, Auth: None)")
+        findings = [f for f in intel_service.list_findings() if f.component_purl == component.purl]
+        exposure = exposure_service.get_component_exposure(component.purl)
+        paths = [
+            path for path in attack_path_service.list_paths()
+            if path.vulnerable_component == component.purl
+        ]
+        upstream = upstream_service.list_commits(component=component.name)
+        lineage_data = inventory_service.get_component_lineage(component.purl)
+        ancestors = lineage_data.get("ancestors", []) if isinstance(lineage_data, dict) else []
 
-        if has_internet and unauth:
-            exposure_verdict = (
-                f"HIGH EXPOSURE: The vulnerable component is actively running in production and is reachable "
-                f"from the public Internet via unauthenticated route '{ep_path}'. It processes untrusted image "
-                f"files directly via its decoder."
+        evidence_ids = list(dict.fromkeys(
+            component.evidence_ids + [eid for finding in findings for eid in finding.evidence_ids]
+        ))
+        citations = [f"Evidence ID: {evidence_id}" for evidence_id in evidence_ids]
+        if not evidence_ids:
+            citations.append("No traceable evidence IDs are attached to this observation.")
+
+        if ancestors:
+            ancestor_names = [
+                ancestor.get("name", str(ancestor)) if isinstance(ancestor, dict) else str(ancestor)
+                for ancestor in ancestors
+            ]
+            lineage = "Observed dependency lineage: " + " -> ".join([*ancestor_names, component.name]) + "."
+        else:
+            lineage = "NOT OBSERVED: no parent dependency relationship is recorded for this component."
+
+        if exposure:
+            network = exposure.network_exposure.value
+            auth = exposure.auth_requirement.value
+            if network == NetworkExposure.UNKNOWN.value:
+                exposure_text = "UNKNOWN: no endpoint is connected to this component."
+            else:
+                exposure_text = f"Endpoint metadata reports network exposure {network} and authentication {auth}."
+                if any(ep.evidence_source == "DEMO_FIXTURE" for ep in exposure.endpoints):
+                    exposure_text = "DEMO FIXTURE ONLY: " + exposure_text
+        else:
+            exposure_text = "UNKNOWN: no endpoint exposure observation is available."
+
+        if paths:
+            fixture_paths = [path for path in paths if getattr(path, "fixture", False)]
+            if fixture_paths:
+                path_text = "DEMO FIXTURE ONLY: seeded attack-path records are simulated and are not application evidence."
+            else:
+                path_text = f"{len(paths)} attack-path record(s) are present; review their evidence before treating them as reachable."
+        else:
+            path_text = "NOT OBSERVED: no verified end-to-end path is available; absence is not proof of isolation."
+
+        if upstream:
+            upstream_text = f"{len(upstream)} upstream change record(s) are stored; they are not automatically classified as security fixes."
+        else:
+            upstream_text = "NOT OBSERVED: no upstream change record is available."
+
+        if findings:
+            vuln_ids = list(dict.fromkeys(finding.vulnerability_id for finding in findings))
+            fixed = list(dict.fromkeys(f.fixed_version for f in findings if f.fixed_version))
+            summary = (
+                f"The current scan records {len(findings)} affected finding(s) for {component.name} "
+                f"{component.version}: {', '.join(vuln_ids)}. This establishes package-level affected status; "
+                "function reachability remains a separate analysis."
+            )
+            remediation = (
+                f"Review an upgrade to {', '.join(fixed)} and submit a fresh inventory observation to verify the result. "
+                "No repository file or pull request was generated."
+                if fixed else
+                "Review the advisory and identify a supported fixed release. No repository file or pull request was generated."
             )
         else:
-            exposure_verdict = "LOW EXPOSURE: Component is shielded behind authenticated internal routes."
-
-        # 4. Attack Path Summary
-        if paths_data:
-            primary_path = paths_data[0]
-            target_res = primary_path.get("target_resource", "Cloud Resource")
-            citations.append(f"Attack Path: {primary_path.get('name', 'Identified Path')}")
-            citations.append(f"Target Resource: {target_res}")
-            attack_path_summary = (
-                f"VERIFIED ATTACK PATH: An external adversary can issue a malicious payload to '{ep_path}', "
-                f"triggering a heap-buffer-overflow (RCE) inside the image-processing container. The container's "
-                f"workload identity (IAM Service Account) then enables unauthorized exfiltration of {target_res}."
+            summary = (
+                f"No vulnerability finding is recorded for {component.name} {component.version} in the current scan state. "
+                "This does not establish that the package has no vulnerabilities; scan freshness and source coverage are not inferred."
             )
-        else:
-            attack_path_summary = "No complete end-to-end attack paths discovered to sensitive cloud assets."
-
-        # 5. Upstream Change & Propagation Summary
-        if upstream_data:
-            latest_commit = upstream_data[0]
-            citations.append(f"Upstream Commit: {latest_commit['commit_sha'][:8]} in {latest_commit['repository']}")
-            upstream_change_summary = (
-                f"Upstream maintainers merged commit {latest_commit['commit_sha'][:8]} ('{latest_commit['message'][:60]}...'). "
-                f"GuardianOS detected safety signals ({', '.join(latest_commit.get('detected_signals', []))}). "
-                f"Fixed version {fixed_ver} is available upstream."
-            )
-        else:
-            upstream_change_summary = f"Fixed release {fixed_ver} is documented in upstream registries."
-
-        if propagation_data:
-            citations.append(f"Propagation Bottleneck: {propagation_data.get('bottleneck_stage')}")
-            propagation_lag = propagation_data.get("summary_explanation", "")
-        else:
-            propagation_lag = f"The upstream fix exists, but container base images have not yet rebuilt."
-
-        # 6. Actionable Remediation
-        remediation_rec = (
-            f"1. Upgrade container Dockerfile base image to fetch patched {clean_name} {fixed_ver}.\n"
-            f"2. Rebuild application container image in CI/CD pipeline.\n"
-            f"3. Deploy updated container and verify attack path closure."
-        )
-
-        executive_summary = (
-            f"Your production '{comp_info.get('application', 'service')}' uses {clean_name} {comp_version} through ImageMagick. "
-            f"The upstream project has released a fix ({fixed_ver}). Your current container has not received the patched package. "
-            f"The vulnerable image-processing path is reachable through your unauthenticated public {ep_path} endpoint. "
-            f"If exploited, the container workload identity could access sensitive cloud resources. "
-            f"Immediate base image rebuild is recommended."
-        )
+            remediation = "No package-specific upgrade recommendation is available from the current findings."
 
         return AIAnalysisReport(
-            query=user_question or f"Explain exposure and attack path for {clean_name}",
-            target_component=clean_name,
-            executive_summary=executive_summary,
-            lineage_explanation=lineage_explanation,
-            exposure_verdict=exposure_verdict,
-            attack_path_summary=attack_path_summary,
-            upstream_change_summary=f"{upstream_change_summary} {propagation_lag}",
-            remediation_recommendation=remediation_rec,
+            query=user_question,
+            target_component=component.name,
+            executive_summary=summary,
+            lineage_explanation=lineage,
+            exposure_verdict=exposure_text,
+            attack_path_summary=path_text,
+            upstream_change_summary=upstream_text,
+            remediation_recommendation=remediation,
             evidence_citations=citations,
-            confidence_score=0.96
+            evidence_ids=evidence_ids,
         )
 
 

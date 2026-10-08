@@ -1,25 +1,24 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
-      - ENVIRONMENT=production
-      - DATABASE_URL=postgresql+asyncpg://guardianos:guardianos_pw@postgres:5432/guardianos
-      - SYNC_DATABASE_URL=postgresql://guardianos:guardianos_pw@postgres:5432/guardianos
-      - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USER=neo4j
-      - NEO4J_PASSWORD=guardianos_pw
-      - USE_IN_MEMORY_GRAPH=false
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      - postgres
-      - neo4j
-      - redis
+      ENVIRONMENT: production
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY to a random value of at least 32 bytes}
+      AUTH_USERS_JSON: ${AUTH_USERS_JSON:?Set AUTH_USERS_JSON to configured account hashes and roles}
+      STATE_DB_PATH: /data/osprey-state.sqlite3
+      USE_IN_MEMORY_GRAPH: "true"
+      ALLOWED_ORIGINS: '["http://127.0.0.1:8080","http://localhost:8080"]'
+    volumes:
+      - osprey_state:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/ready"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
 
   frontend:
@@ -27,36 +26,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "80:80"
+      - "127.0.0.1:8080:80"
     depends_on:
-      - backend
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      - POSTGRES_DB=guardianos
-      - POSTGRES_USER=guardianos
-      - POSTGRES_PASSWORD=guardianos_pw
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-
-  neo4j:
-    image: neo4j:5.18-community
-    environment:
-      - NEO4J_AUTH=neo4j/guardianos_pw
-    ports:
-      - "7474:7474"
-      - "7687:7687"
-    volumes:
-      - neo4jdata:/data
-    restart: unless-stopped
-
-  redis:
-    image: redis:7.2-alpine
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
-  pgdata:
-  neo4jdata:
+  osprey_state:

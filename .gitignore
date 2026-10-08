@@ -17,6 +17,9 @@ venv/
 # Database & Logs
 *.db
 *.sqlite
+osprey-state.sqlite3
+osprey-state.sqlite3-shm
+osprey-state.sqlite3-wal
 *.log
 
 # IDE & OS
@@ -24,4 +27,31 @@ venv/
 .idea/
 .DS_Store
 Thumbs.db
+# Local environment/configuration; only the placeholder example belongs in Git.
 .env
+.env.*
+!.env.example
+
+# SQLite and local Osprey state
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+*.db-shm
+*.db-wal
+.osprey-cache/
+osprey-cache/
+
+# Test and scanner scratch output
+.phase9-pytest-tmp/
+.pytest-tmp/
+osprey-scan-output/
+/osprey-scan*.sarif
+
+# Python build/test output
+.mypy_cache/
+.ruff_cache/
+coverage.xml
+
+# Temporary local artifacts
+*.tmp
+*.temp

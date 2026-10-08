@@ -1,67 +1,49 @@
-import React, { useState, useEffect } from 'react';
-import { AIAnalysisReport } from '../types';
-import {
-  X,
-  Sparkles,
-  Search,
-  Activity,
-  Layers,
-  ShieldAlert,
-  ArrowRight,
-  ShieldCheck,
-  BookmarkCheck,
-  Lock,
-  Cpu,
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { CopilotResponse } from '../types';
+import { Activity, BookmarkCheck, Lock, Search, Sparkles, X } from 'lucide-react';
 
 interface AiCopilotDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  targetComponent: string;
-  onQuery: (component: string, question: string) => Promise<AIAnalysisReport>;
+  findingId: string;
+  onQuery: (findingId: string, question: string) => Promise<CopilotResponse>;
 }
 
-const PRESET_QUERIES = [
-  'Why is this component dangerous and how can it be reached?',
-  'Explain the attack path from the Internet to AWS S3 storage.',
-  'What changed in upstream commits and why did the fix lag in production?',
-  'What is the recommended remediation Pull Request?',
+const PRESET_QUESTIONS = [
+  'Why is this vulnerability risky?',
+  'Is the vulnerable function reachable?',
+  'What runtime evidence exists?',
+  'Why was remediation not verified?',
 ];
 
 export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
   isOpen,
   onClose,
-  targetComponent,
+  findingId,
   onQuery,
 }) => {
-  const [component, setComponent] = useState(targetComponent || 'libheif');
-  const [question, setQuestion] = useState(PRESET_QUERIES[0]);
+  const [question, setQuestion] = useState(PRESET_QUESTIONS[0]);
   const [loading, setLoading] = useState(false);
-  const [report, setReport] = useState<AIAnalysisReport | null>(null);
+  const [report, setReport] = useState<CopilotResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (targetComponent) {
-      setComponent(targetComponent);
-    }
-  }, [targetComponent]);
+    setReport(null);
+    setError(null);
+  }, [findingId]);
 
   useEffect(() => {
-    // Auto-fetch if drawer opens with a valid component
-    if (isOpen && component && !report) {
-      handleAnalyze(component, question);
-    }
-  }, [isOpen, component]);
+    if (isOpen && findingId) void handleQuery(findingId, question);
+  }, [isOpen, findingId]);
 
-  const handleAnalyze = async (compName: string, q: string) => {
-    if (!compName.trim()) return;
+  const handleQuery = async (id: string, q: string) => {
+    if (!id.trim() || !q.trim()) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await onQuery(compName.trim(), q.trim());
-      setReport(res);
+      setReport(await onQuery(id.trim(), q.trim()));
     } catch (err: any) {
-      setError(err?.message || 'Failed to complete AI synthesis');
+      setError(err?.message || 'Copilot query failed');
     } finally {
       setLoading(false);
     }
@@ -70,166 +52,83 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm transition-opacity">
-      <div className="w-full max-w-lg bg-black border-l border-neutral-900 h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
-        {/* Drawer Header */}
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-lg bg-black border-l border-neutral-900 h-full flex flex-col shadow-2xl">
         <div className="px-5 py-3.5 border-b border-neutral-900 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-6 h-6 rounded bg-neutral-900 border border-neutral-800 flex items-center justify-center text-white">
-              <Sparkles className="w-3.5 h-3.5" />
-            </div>
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-neutral-300" />
             <div>
-              <h3 className="text-xs font-semibold text-white tracking-tight">AI Security Copilot</h3>
-              <p className="text-[10px] text-neutral-400 font-mono">Evidence-Grounded Threat Synthesis</p>
+              <h3 className="text-xs font-semibold text-white">Evidence Copilot</h3>
+              <p className="text-[10px] text-neutral-400 font-mono">AI explanation · read-only · evidence-grounded</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded text-neutral-500 hover:text-white hover:bg-neutral-900 transition-colors"
-          >
+          <button onClick={onClose} className="p-1 rounded text-neutral-500 hover:text-white" aria-label="Close copilot">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Query Input Area */}
-        <div className="p-4 border-b border-neutral-900 space-y-2.5 bg-neutral-950">
+        <div className="p-4 border-b border-neutral-900 space-y-2 bg-neutral-950">
+          <div className="text-[10px] font-mono text-neutral-400">Finding ID: <span className="text-neutral-200">{findingId || 'UNKNOWN'}</span></div>
           <div className="flex gap-2">
             <input
-              type="text"
-              value={component}
-              onChange={(e) => setComponent(e.target.value)}
-              placeholder="Component (e.g. libheif)"
-              className="w-36 px-2.5 py-1.5 rounded-md bg-black border border-neutral-900 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-700 font-mono"
-            />
-            <input
-              type="text"
+              aria-label="Ask about finding"
               value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask inquiry..."
-              className="flex-1 px-2.5 py-1.5 rounded-md bg-black border border-neutral-900 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-700"
+              onChange={(event) => setQuestion(event.target.value)}
+              maxLength={2000}
+              placeholder="Ask about this finding..."
+              className="flex-1 px-2.5 py-1.5 rounded-md bg-black border border-neutral-900 text-xs text-white"
             />
             <button
-              onClick={() => handleAnalyze(component, question)}
-              disabled={loading || !component.trim()}
-              className="px-3 py-1.5 rounded-md text-xs font-semibold bg-white hover:bg-neutral-200 text-black transition-all shrink-0 disabled:opacity-50"
+              onClick={() => void handleQuery(findingId, question)}
+              disabled={loading || !findingId || !question.trim()}
+              className="px-3 py-1.5 rounded-md text-xs font-semibold bg-white text-black disabled:opacity-50"
+              aria-label="Query evidence copilot"
             >
               {loading ? <Activity className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
             </button>
           </div>
-
-          {/* Quick Presets */}
           <div className="flex flex-wrap gap-1">
-            {PRESET_QUERIES.map((q, idx) => (
-              <button
-                key={idx}
-                onClick={() => {
-                  setQuestion(q);
-                  handleAnalyze(component, q);
-                }}
-                className="px-2 py-0.5 rounded text-[10px] text-neutral-400 bg-black hover:bg-neutral-900 hover:text-white border border-neutral-900 transition-all truncate max-w-[220px]"
-              >
-                {q}
+            {PRESET_QUESTIONS.map((preset) => (
+              <button key={preset} onClick={() => { setQuestion(preset); void handleQuery(findingId, preset); }} className="px-2 py-0.5 rounded text-[10px] text-neutral-400 bg-black border border-neutral-900 hover:text-white">
+                {preset}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Report Content Body */}
         <div className="flex-1 p-5 overflow-y-auto space-y-4">
-          {error && (
-            <div className="p-3 rounded-lg bg-neutral-950 border border-red-900/60 text-red-400 text-xs font-mono">
-              {error}
-            </div>
-          )}
-
-          {loading && !report && (
-            <div className="py-20 text-center space-y-2">
-              <Activity className="w-6 h-6 text-neutral-400 animate-spin mx-auto" />
-              <p className="text-xs text-neutral-400 font-mono">Grounding graph facts & CVE data...</p>
-            </div>
-          )}
+          {error && <div role="alert" className="p-3 rounded-lg bg-neutral-950 border border-red-900/60 text-red-400 text-xs">{error}</div>}
+          {loading && <div className="py-12 text-center text-xs text-neutral-400"><Activity className="w-5 h-5 mx-auto mb-2 animate-spin" />Loading verified records...</div>}
 
           {report && (
-            <div className="space-y-3.5 animate-in fade-in duration-150">
-              {/* Meta strip */}
-              <div className="flex items-center justify-between text-[10px] font-mono pb-2 border-b border-neutral-900">
-                <span className="text-neutral-400">
-                  Target: <strong className="text-white">{report.target_component}</strong>
-                </span>
-                <span className="text-emerald-400 flex items-center space-x-1">
-                  <Lock className="w-3 h-3" />
-                  <span>Confidence: {(report.confidence_score * 100).toFixed(0)}%</span>
-                </span>
-              </div>
+            <div className="space-y-4">
+              <section className="p-3 rounded-lg border border-sky-900/50 bg-sky-950/10 space-y-2">
+                <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase text-sky-300"><Lock className="w-3 h-3" />Deterministic Osprey Finding</div>
+                <div className="text-xs text-neutral-200">{report.deterministic_finding.vulnerability_id} · {report.deterministic_finding.package} · {report.deterministic_finding.severity}</div>
+                <div className="text-[11px] text-neutral-400">Static reachability: {report.deterministic_finding.reachability}</div>
+                <div className="text-[10px] font-mono text-neutral-500">Runtime: {Object.entries(report.deterministic_finding.runtime_state).map(([key, value]) => `${key}=${value}`).join(' · ')}</div>
+              </section>
 
-              {/* Executive Summary */}
-              <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-900 space-y-1">
-                <span className="text-[10px] font-mono uppercase text-neutral-400">Executive Summary</span>
-                <p className="text-xs text-neutral-200 leading-relaxed">{report.executive_summary}</p>
-              </div>
+              <section className="p-3 rounded-lg bg-neutral-950 border border-neutral-900 space-y-2">
+                <div className="text-[10px] font-mono uppercase text-violet-300">AI Explanation</div>
+                <p className="text-xs text-neutral-200 leading-relaxed">{report.answer}</p>
+                <p className="text-[10px] text-neutral-500">Osprey renders every factual claim from verified evidence. The provider cannot change severity, reachability, runtime state, risk, or verification.</p>
+                <p className="text-[10px] text-neutral-500">Provider: {report.provider} · Output validation: {report.validation_status} · AI explanation confidence: {report.ai_explanation_confidence}</p>
+              </section>
 
-              {/* Lineage Breakdown */}
-              <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-900 space-y-1">
-                <span className="text-[10px] font-mono uppercase text-neutral-400 flex items-center space-x-1">
-                  <Layers className="w-3 h-3 text-neutral-400" />
-                  <span>Lineage & Packaging</span>
-                </span>
-                <p className="text-xs text-neutral-300 leading-relaxed">{report.lineage_explanation}</p>
-              </div>
+              <section className="space-y-2">
+                <div className="text-[10px] font-mono uppercase text-neutral-400 flex items-center gap-1"><BookmarkCheck className="w-3 h-3" />Evidence-backed claims</div>
+                {report.claims.map((claim, index) => (
+                  <div key={`${claim.text}-${index}`} className="p-2.5 rounded bg-neutral-950 border border-neutral-900 text-xs text-neutral-300">
+                    <p>{claim.text}</p>
+                    <div className="mt-1 text-[10px] font-mono text-sky-300">Evidence: {claim.evidence_ids.length ? claim.evidence_ids.join(', ') : 'No verified evidence reference'}</div>
+                  </div>
+                ))}
+              </section>
 
-              {/* Exposure Verdict */}
-              <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-900 space-y-1">
-                <span className="text-[10px] font-mono uppercase text-red-400 flex items-center space-x-1">
-                  <ShieldAlert className="w-3 h-3 text-red-400" />
-                  <span>Runtime Exposure</span>
-                </span>
-                <p className="text-xs text-neutral-300 leading-relaxed">{report.exposure_verdict}</p>
-              </div>
-
-              {/* Attack Path */}
-              <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-900 space-y-1">
-                <span className="text-[10px] font-mono uppercase text-neutral-400 flex items-center space-x-1">
-                  <ArrowRight className="w-3 h-3 text-neutral-400" />
-                  <span>Exploit Traversal</span>
-                </span>
-                <p className="text-xs text-neutral-300 leading-relaxed">{report.attack_path_summary}</p>
-              </div>
-
-              {/* Upstream Changes */}
-              <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-900 space-y-1">
-                <span className="text-[10px] font-mono uppercase text-neutral-400 flex items-center space-x-1">
-                  <Cpu className="w-3 h-3 text-neutral-400" />
-                  <span>Upstream Commit Signals</span>
-                </span>
-                <p className="text-xs text-neutral-300 leading-relaxed">{report.upstream_change_summary}</p>
-              </div>
-
-              {/* Remediation */}
-              <div className="p-3 rounded-lg bg-neutral-950 border border-emerald-900/50 space-y-1">
-                <span className="text-[10px] font-mono uppercase text-emerald-400 flex items-center space-x-1">
-                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                  <span>Recommended Remediation</span>
-                </span>
-                <p className="text-xs text-neutral-200 leading-relaxed">{report.remediation_recommendation}</p>
-              </div>
-
-              {/* Citations */}
-              <div className="pt-2 border-t border-neutral-900 space-y-1.5">
-                <div className="text-[10px] font-mono text-neutral-400 flex items-center space-x-1">
-                  <BookmarkCheck className="w-3 h-3" />
-                  <span>Verified Graph Citations ({report.evidence_citations.length})</span>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {report.evidence_citations.map((cite, i) => (
-                    <span
-                      key={i}
-                      className="px-2 py-0.5 rounded text-[10px] font-mono bg-neutral-950 border border-neutral-900 text-neutral-400"
-                    >
-                      {cite}
-                    </span>
-                  ))}
-                </div>
-              </div>
+              {report.unknowns.length > 0 && <section className="p-3 rounded-lg bg-amber-950/10 border border-amber-900/40"><div className="text-[10px] font-mono uppercase text-amber-300 mb-1">Unknowns</div><ul className="list-disc pl-4 text-xs text-neutral-300 space-y-1">{report.unknowns.map((item, index) => <li key={index}>{item}</li>)}</ul></section>}
+              {report.limitations.length > 0 && <section className="p-3 rounded-lg bg-neutral-950 border border-neutral-900"><div className="text-[10px] font-mono uppercase text-neutral-400 mb-1">Limitations</div><ul className="list-disc pl-4 text-xs text-neutral-400 space-y-1">{report.limitations.map((item, index) => <li key={index}>{item}</li>)}</ul></section>}
+              {report.recommended_next_steps.length > 0 && <section className="p-3 rounded-lg bg-neutral-950 border border-neutral-900"><div className="text-[10px] font-mono uppercase text-neutral-400 mb-1">Recommended next investigation</div><ul className="list-disc pl-4 text-xs text-neutral-300 space-y-1">{report.recommended_next_steps.map((item, index) => <li key={index}>{item}</li>)}</ul></section>}
             </div>
           )}
         </div>

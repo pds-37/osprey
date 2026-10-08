@@ -6,15 +6,11 @@ from guardianos.api.app import app
 client = TestClient(app)
 
 
-def test_list_upstream_changes_seeded():
+def test_upstream_changes_are_empty_without_ingestion():
     resp = client.get("/api/v1/upstream-changes")
     assert resp.status_code == 200
     commits = resp.json()
-    assert len(commits) >= 1
-    libheif_c = next((c for c in commits if c["component_name"] == "libheif"), None)
-    assert libheif_c is not None
-    assert libheif_c["classification"] == "SUSPECTED_SECURITY_CHANGE"
-    assert "integer conversion" in libheif_c["detected_signals"]
+    assert commits == []
 
 
 def test_analyze_commit_api():
@@ -30,5 +26,6 @@ def test_analyze_commit_api():
     assert resp.status_code == 201
     data = resp.json()
     assert data["classification"] == "SUSPECTED_SECURITY_CHANGE"
-    assert data["confidence"] >= 0.70
+    assert data["confidence"] <= 0.50
+    assert data["evidence_ids"]
     assert "buffer overflow" in data["detected_signals"]

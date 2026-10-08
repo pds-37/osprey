@@ -16,37 +16,46 @@ class PropagationService:
     def __init__(self) -> None:
         self.graph = get_graph_store()
 
-    def evaluate_all(self) -> List[PatchPropagationRecord]:
+    def evaluate_all(self, *, include_demo_fixtures: bool = False) -> List[PatchPropagationRecord]:
         """Evaluate patch propagation across all active vulnerability findings."""
         findings = intel_service.list_findings()
         results = []
+        _propagation_db.clear()
+
+        if not findings:
+            return []
 
         for finding in findings:
             comp = inventory_service.get_component(finding.component_purl)
             if not comp:
                 continue
 
-            record = evaluate_patch_propagation(finding=finding, component=comp)
+            record = evaluate_patch_propagation(
+                finding=finding,
+                component=comp,
+                include_demo_fixtures=include_demo_fixtures,
+            )
             _propagation_db[record.id] = record
             results.append(record)
 
             # Correlate in Knowledge Graph
-            stage_node_id = f"stage:{record.bottleneck_stage.value}"
-            self.graph.add_node(
-                node_id=stage_node_id,
-                label="PropagationStage",
-                properties={
-                    "stage": record.bottleneck_stage.value,
-                    "is_blocked": True,
-                    "bottleneck_for": record.component_name
-                }
-            )
-            self.graph.add_edge(
-                source_id=f"vuln:{finding.vulnerability_id}",
-                target_id=stage_node_id,
-                relation="BLOCKED_AT_STAGE",
-                properties={"component": record.component_name}
-            )
+            if record.bottleneck_stage is not None:
+                stage_node_id = f"stage:{record.bottleneck_stage.value}"
+                self.graph.add_node(
+                    node_id=stage_node_id,
+                    label="PropagationStage",
+                    properties={
+                        "stage": record.bottleneck_stage.value,
+                        "is_blocked": record.stages[record.bottleneck_stage].status.value == "BLOCKED",
+                        "bottleneck_for": record.component_name
+                    }
+                )
+                self.graph.add_edge(
+                    source_id=f"vuln:{finding.vulnerability_id}",
+                    target_id=stage_node_id,
+                    relation="BLOCKED_AT_STAGE",
+                    properties={"component": record.component_name}
+                )
 
         return results
 

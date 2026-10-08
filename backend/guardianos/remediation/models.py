@@ -20,14 +20,16 @@ class RemediationStatus(str, Enum):
     REJECTED = "REJECTED"
     DEPLOYED = "DEPLOYED"
     VERIFIED_CLOSED = "VERIFIED_CLOSED"
+    VERIFIED_RESOLVED = "VERIFIED_RESOLVED"
+    UNVERIFIED = "UNVERIFIED"
 
 
 class PullRequestProposal(BaseModel):
     title: str = Field(..., description="PR title following conventional commits")
     body: str = Field(..., description="Detailed description with CVE context and evidence")
-    branch_name: str = Field(...)
-    target_file: str = Field(...)
-    diff_content: str = Field(..., description="Unified diff formatted snippet")
+    branch_name: Optional[str] = None
+    target_file: Optional[str] = None
+    diff_content: Optional[str] = Field(None, description="Populated only when a real repository diff is generated")
 
 
 class RemediationTask(BaseModel):
@@ -44,4 +46,5 @@ class RemediationTask(BaseModel):
     approved_at: Optional[datetime] = None
     verified_at: Optional[datetime] = None
     verification_evidence: Optional[Dict[str, Any]] = None
+    fixture: bool = Field(default=False, description="True only when this recommendation is associated with demo fixture data")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

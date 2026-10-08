@@ -1,0 +1,13 @@
+{
+  "name": "vulnerable-demo-app",
+  "version": "1.0.0",
+  "description": "Sample application demonstrating Osprey supply chain exposure triage",
+  "main": "server.js",
+  "dependencies": {
+    "express": "4.17.1",
+    "lodash": "4.17.20"
+  },
+  "devDependencies": {
+    "mocha": "8.0.0"
+  }
+}

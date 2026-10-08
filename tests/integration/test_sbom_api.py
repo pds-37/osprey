@@ -23,7 +23,7 @@ def test_sbom_upload_and_query_flow(sample_cyclonedx_json):
         "content": json.loads(sample_cyclonedx_json),
         "application": "payment-gateway",
         "environment": "production",
-        "state": "RUNNING"
+        "state": "UNKNOWN"
     }
     upload_resp = client.post("/api/v1/sboms/upload", json=payload)
     assert upload_resp.status_code == 201
@@ -31,6 +31,7 @@ def test_sbom_upload_and_query_flow(sample_cyclonedx_json):
     assert data["application"] == "payment-gateway"
     assert data["components_count"] == 4
     assert data["relationships_count"] == 3
+    assert all(component["state"] != "RUNNING" for component in data["components"])
 
     # 2. List SBOMs
     list_resp = client.get("/api/v1/sboms")
@@ -70,3 +71,16 @@ def test_sbom_upload_and_query_flow(sample_cyclonedx_json):
     assert audit_resp.status_code == 200
     events = audit_resp.json()
     assert any(e["action"] == "SBOM_INGESTED" for e in events)
+
+
+def test_clear_inventory_endpoint():
+    clear_resp = client.post("/api/v1/sboms/clear")
+    assert clear_resp.status_code == 200
+    assert clear_resp.json()["status"] == "cleared"
+
+    # Confirm components, sboms, and graph are empty
+    assert client.get("/api/v1/components").json() == []
+    assert client.get("/api/v1/sboms").json() == []
+    graph = client.get("/api/v1/graph/data").json()
+    assert len(graph["nodes"]) == 0
+    assert len(graph["edges"]) == 0

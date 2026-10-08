@@ -1,4 +1,4 @@
-"""Authoritative vulnerability intelligence repository and feed registry."""
+"""Explicitly seeded demo advisories; production starts with no local mock records."""
 
 from datetime import datetime, timezone
 from typing import Dict, List
@@ -19,6 +19,7 @@ DEFAULT_ADVISORIES: List[VulnerabilityRecord] = [
         ecosystem=Ecosystem.DEBIAN,
         component_name="libheif",
         affected_version_ranges=["< 1.19.8", "<= 1.19.7"],
+        introduced_versions=["0"],
         fixed_versions=["1.19.8"],
         severity=VulnerabilitySeverity.CRITICAL,
         cvss_score=9.8,
@@ -28,7 +29,7 @@ DEFAULT_ADVISORIES: List[VulnerabilityRecord] = [
             "https://github.com/strukturag/libheif/commit/e31a196ec2b07d6b38c353b3df8d3dbb4cfae977"
         ],
         published_at=datetime(2023, 10, 1, 12, 0, tzinfo=timezone.utc),
-        source=VulnerabilitySource.DEBIAN
+        source=VulnerabilitySource.DEMO_FIXTURE
     ),
     VulnerabilityRecord(
         id="CVE-2022-44268",
@@ -38,13 +39,14 @@ DEFAULT_ADVISORIES: List[VulnerabilityRecord] = [
         ecosystem=Ecosystem.DEBIAN,
         component_name="imagemagick",
         affected_version_ranges=["< 7.1.1-29"],
+        introduced_versions=["0"],
         fixed_versions=["7.1.1-29"],
         severity=VulnerabilitySeverity.HIGH,
         cvss_score=7.5,
         cwe_ids=["CWE-200"],
         references=["https://nvd.nist.gov/vuln/detail/CVE-2022-44268"],
         published_at=datetime(2023, 2, 6, 0, 0, tzinfo=timezone.utc),
-        source=VulnerabilitySource.OSV
+        source=VulnerabilitySource.DEMO_FIXTURE
     ),
     VulnerabilityRecord(
         id="CVE-2024-21626",
@@ -54,13 +56,14 @@ DEFAULT_ADVISORIES: List[VulnerabilityRecord] = [
         ecosystem=Ecosystem.DOCKER,
         component_name="runc",
         affected_version_ranges=["<= 1.1.11"],
+        introduced_versions=["0"],
         fixed_versions=["1.1.12"],
         severity=VulnerabilitySeverity.CRITICAL,
         cvss_score=9.9,
         cwe_ids=["CWE-403"],
         references=["https://github.com/opencontainers/runc/security/advisories/GHSA-xr7r-f8xq-vfvv"],
         published_at=datetime(2024, 1, 31, 0, 0, tzinfo=timezone.utc),
-        source=VulnerabilitySource.GITHUB
+        source=VulnerabilitySource.DEMO_FIXTURE
     ),
     VulnerabilityRecord(
         id="GHSA-w596-4wvx-j9j6",
@@ -70,24 +73,32 @@ DEFAULT_ADVISORIES: List[VulnerabilityRecord] = [
         ecosystem=Ecosystem.PYPI,
         component_name="pydantic",
         affected_version_ranges=["< 2.6.0"],
+        introduced_versions=["0"],
         fixed_versions=["2.6.0"],
         severity=VulnerabilitySeverity.MEDIUM,
         cvss_score=5.3,
         cwe_ids=["CWE-1333"],
         references=["https://github.com/pydantic/pydantic/security/advisories/GHSA-w596-4wvx-j9j6"],
         published_at=datetime(2024, 2, 1, 0, 0, tzinfo=timezone.utc),
-        source=VulnerabilitySource.GITHUB
+        source=VulnerabilitySource.DEMO_FIXTURE
     )
 ]
 
 
 class VulnerabilityFeedRegistry:
-    """Stores known vulnerabilities and allows dynamic ingestion from OSV/NVD feeds."""
+    """Stores advisory records; bundled records load only in explicit demo/test mode."""
 
-    def __init__(self) -> None:
+    def __init__(self, include_demo_fixtures: bool | None = None) -> None:
         self.advisories: Dict[str, VulnerabilityRecord] = {}
-        for adv in DEFAULT_ADVISORIES:
-            self.register_advisory(adv)
+        if include_demo_fixtures is None:
+            from guardianos.core.config import settings
+            include_demo_fixtures = settings.ENABLE_DEMO_FIXTURES
+        if include_demo_fixtures:
+            self.load_demo_fixtures()
+
+    def load_demo_fixtures(self) -> None:
+        for advisory in DEFAULT_ADVISORIES:
+            self.register_advisory(advisory.model_copy(deep=True))
 
     def register_advisory(self, adv: VulnerabilityRecord) -> None:
         self.advisories[adv.id] = adv

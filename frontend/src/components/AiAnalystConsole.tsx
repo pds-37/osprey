@@ -20,9 +20,9 @@ interface AiAnalystConsoleProps {
 
 const SAMPLE_QUESTIONS = [
   'Why is this component dangerous and how can it be reached?',
-  'Explain the attack path from the Internet to AWS S3 storage.',
-  'What changed in upstream commits and why did the fix lag in production?',
-  'What is the recommended remediation Pull Request?',
+  'Which evidence supports this finding and what remains unknown?',
+  'Is there a reachability result in the current records?',
+  'What remediation is recommended from the current records?',
 ];
 
 const COMMON_COMPONENTS = ['libheif', 'imagemagick', 'urllib3', 'semver', 'axios'];
@@ -58,13 +58,13 @@ export const AiAnalystConsole: React.FC<AiAnalystConsoleProps> = ({
         <div>
           <h2 className="text-sm font-semibold text-white tracking-tight flex items-center space-x-2">
             <Sparkles className="w-3.5 h-3.5 text-neutral-300" />
-            <span>AI Security Analyst</span>
+            <span>Evidence Summary</span>
             <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-neutral-900 text-neutral-400 border border-neutral-800">
-              Deterministic Grounding
+              Deterministic
             </span>
           </h2>
           <p className="text-xs text-neutral-400 mt-0.5">
-            Deterministic graph & CVE evidence synthesized with zero hallucination and prompt-injection defense.
+            Summarizes existing inventory and advisory records; it does not create evidence or use a language model.
           </p>
         </div>
 
@@ -104,14 +104,14 @@ export const AiAnalystConsole: React.FC<AiAnalystConsoleProps> = ({
 
           <div className="md:col-span-3 space-y-1">
             <label className="text-[10px] font-mono uppercase text-neutral-400">
-              Investigation Prompt
+              Question about stored records
             </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Ask specific threat, lineage, or attack path questions..."
+                placeholder="Ask about observed components, advisories, or evidence..."
                 className="flex-1 px-2.5 py-1.5 rounded-lg bg-black border border-neutral-900 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-700"
               />
               <button
@@ -122,12 +122,12 @@ export const AiAnalystConsole: React.FC<AiAnalystConsoleProps> = ({
                 {loading ? (
                   <>
                     <Activity className="w-3.5 h-3.5 animate-spin" />
-                    <span>Reasoning...</span>
+                    <span>Summarizing...</span>
                   </>
                 ) : (
                   <>
                     <Search className="w-3.5 h-3.5" />
-                    <span>Run Synthesis</span>
+                    <span>Summarize Records</span>
                   </>
                 )}
               </button>
@@ -156,18 +156,15 @@ export const AiAnalystConsole: React.FC<AiAnalystConsoleProps> = ({
         </div>
       )}
 
-      {/* Synthesis Output Report Card */}
+      {/* Deterministic Summary */}
       {report && (
         <div className="p-5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-4">
           {/* Report Top Meta */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-neutral-900">
             <div>
               <div className="flex items-center space-x-2">
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-neutral-900 text-neutral-300 border border-neutral-800">
-                  CONFIDENCE: {(report.confidence_score * 100).toFixed(0)}%
-                </span>
                 <h3 className="font-semibold text-xs text-white">
-                  Threat Synthesis: <span className="font-mono text-neutral-200">{report.target_component}</span>
+                  Evidence Summary: <span className="font-mono text-neutral-200">{report.target_component}</span>
                 </h3>
               </div>
               <p className="text-[11px] text-neutral-400 mt-0.5 italic">"{report.query}"</p>
@@ -183,7 +180,7 @@ export const AiAnalystConsole: React.FC<AiAnalystConsoleProps> = ({
           <div className="p-3 rounded-lg bg-black border border-neutral-900 space-y-1">
             <h4 className="text-[10px] font-mono uppercase text-neutral-400 flex items-center space-x-1.5">
               <Activity className="w-3 h-3 text-neutral-400" />
-              <span>Executive Synthesis</span>
+              <span>Summary</span>
             </h4>
             <p className="text-xs text-neutral-200 leading-relaxed">{report.executive_summary}</p>
           </div>
@@ -199,11 +196,11 @@ export const AiAnalystConsole: React.FC<AiAnalystConsoleProps> = ({
               <p className="text-xs text-neutral-300 leading-relaxed">{report.lineage_explanation}</p>
             </div>
 
-            {/* Runtime Exposure Verdict */}
+            {/* Endpoint Context */}
             <div className="p-3 rounded-lg bg-black border border-neutral-900 space-y-1">
               <h5 className="text-[10px] font-mono uppercase text-neutral-400 flex items-center space-x-1.5">
                 <ShieldAlert className="w-3 h-3 text-red-400" />
-                <span>Runtime Exposure Verdict</span>
+                <span>Endpoint Context</span>
               </h5>
               <p className="text-xs text-neutral-300 leading-relaxed">{report.exposure_verdict}</p>
             </div>
@@ -212,7 +209,7 @@ export const AiAnalystConsole: React.FC<AiAnalystConsoleProps> = ({
             <div className="p-3 rounded-lg bg-black border border-neutral-900 space-y-1">
               <h5 className="text-[10px] font-mono uppercase text-neutral-400 flex items-center space-x-1.5">
                 <ArrowRight className="w-3 h-3 text-neutral-400" />
-                <span>Attack Path Traversal</span>
+                <span>Attack Path Records</span>
               </h5>
               <p className="text-xs text-neutral-300 leading-relaxed">{report.attack_path_summary}</p>
             </div>
@@ -240,7 +237,7 @@ export const AiAnalystConsole: React.FC<AiAnalystConsoleProps> = ({
           <div className="pt-2 border-t border-neutral-900 space-y-1.5">
             <div className="flex items-center space-x-1.5 text-[10px] font-mono text-neutral-400">
               <BookmarkCheck className="w-3 h-3 text-neutral-400" />
-              <span>Authoritative Citations ({report.evidence_citations.length} verified facts)</span>
+              <span>Evidence References ({report.evidence_citations.length})</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {report.evidence_citations.map((cite, i) => (

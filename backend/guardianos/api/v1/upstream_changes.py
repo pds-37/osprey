@@ -1,12 +1,14 @@
 """Upstream changes API endpoints."""
 
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from guardianos.upstream.models import CommitRecord
 from guardianos.upstream.service import upstream_service
+from guardianos.api.security import SecuredAPIRouter
+from guardianos.core.security import require_single_organization
 
-router = APIRouter(prefix="/upstream-changes", tags=["Upstream Changes"])
+router = SecuredAPIRouter(prefix="/upstream-changes", tags=["Upstream Changes"], dependencies=[Depends(require_single_organization)])
 
 
 class AnalyzeCommitRequest(BaseModel):

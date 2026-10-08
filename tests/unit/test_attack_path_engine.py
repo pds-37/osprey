@@ -30,11 +30,15 @@ def test_construct_attack_path_full_flow():
     # Trigger vulnerability match
     intel_service.scan_all_components()
 
-    # Construct attack paths
+    # Normal analysis must not infer public ingress or cloud assets from package state.
     paths = construct_attack_paths()
-    assert len(paths) >= 1
+    assert paths == []
 
+    # Synthetic paths are available only in the explicit fixture mode.
+    paths = construct_attack_paths(include_demo_fixtures=True)
+    assert len(paths) >= 1
     p = paths[0]
+    assert p.fixture is True
     assert p.status == AttackPathStatus.OPEN
     assert p.entry_point == "Internet (POST /upload)"
     assert p.target_resource == "s3://customer-media-production"

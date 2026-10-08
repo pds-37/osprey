@@ -1,6 +1,7 @@
 """Exposure service managing runtime endpoints and reachability profiles."""
 
 from typing import Dict, List, Optional
+import json
 from guardianos.exposure.analyzer import evaluate_component_exposure
 from guardianos.exposure.models import (
     AuthRequirement,
@@ -11,8 +12,14 @@ from guardianos.exposure.models import (
 )
 from guardianos.graph.builder import get_graph_store
 from guardianos.inventory.service import inventory_service
+from guardianos.storage.evidence import evidence_store
+from osprey.core.models import EvidenceType
+from guardianos.storage.sqlite import state_store
 
-_endpoints_db: Dict[str, EndpointProfile] = {}
+_endpoints_db: Dict[str, EndpointProfile] = {
+    key: EndpointProfile.model_validate(value)
+    for key, value in state_store.list("exposures").items()
+}
 
 
 class ExposureService:
@@ -20,10 +27,21 @@ class ExposureService:
 
     def __init__(self) -> None:
         self.graph = get_graph_store()
-        self._seed_default_endpoints()
 
-    def register_endpoint(self, ep: EndpointProfile) -> EndpointProfile:
+    def register_endpoint(self, ep: EndpointProfile, *, demo_fixture: bool = False) -> EndpointProfile:
+        source = "DEMO_FIXTURE" if demo_fixture else "USER_INPUT"
+        ep = ep.model_copy(update={"evidence_source": source, "evidence_ids": []})
+        record = evidence_store.add(
+            evidence_type=EvidenceType.USER_INPUT,
+            source=source,
+            location=ep.id,
+            content=json.dumps(ep.model_dump(mode="json"), sort_keys=True),
+            confidence=0.25 if demo_fixture else 0.5,
+            metadata={"assertion_type": "endpoint_configuration", "endpoint_id": ep.id},
+        )
+        ep = ep.model_copy(update={"evidence_ids": [record.id]})
         _endpoints_db[ep.id] = ep
+        state_store.put("exposures", ep.id, ep)
 
         # Correlate in Knowledge Graph
         # 1. Internet entry node
@@ -58,7 +76,19 @@ class ExposureService:
             if comps:
                 comp = comps[0]
         if not comp:
-            return None
+            # Preserve uncertainty when no inventory observation exists.
+            from guardianos.inventory.models import Component as Comp, Ecosystem, DependencyState as DS
+            stub = Comp(
+                id=f"pkg:generic/{purl_or_name}@unknown",
+                name=purl_or_name,
+                ecosystem=Ecosystem.GENERIC,
+                version="unknown",
+                purl=f"pkg:generic/{purl_or_name}@unknown",
+                state=DS.UNKNOWN,
+                application="unknown",
+                environment="unknown"
+            )
+            return evaluate_component_exposure(component=stub, matching_endpoints=[])
 
         # Find endpoints mapped to this component or its application
         matching_eps = [
@@ -71,23 +101,9 @@ class ExposureService:
     def list_endpoints(self) -> List[EndpointProfile]:
         return list(_endpoints_db.values())
 
-    def _seed_default_endpoints(self) -> None:
-        """Seed flagship public upload endpoint connected to ImageMagick and libheif."""
-        default_ep = EndpointProfile(
-            id="ep-media-upload",
-            path="POST /upload",
-            service="image-service",
-            network_exposure=NetworkExposure.INTERNET_FACING,
-            auth_requirement=AuthRequirement.NONE,
-            processing_type=DataProcessingType.PARSER_UNTRUSTED_INPUT,
-            is_public=True,
-            connected_components=["imagemagick", "libheif"]
-        )
-        self.register_endpoint(default_ep)
-
     def clear(self) -> None:
         _endpoints_db.clear()
-        self._seed_default_endpoints()
+        state_store.clear("exposures")
 
 
 exposure_service = ExposureService()

@@ -1,7 +1,6 @@
-"""Deterministic security tools for AI Security Analyst function calling."""
+"""Read-only deterministic data access helpers for evidence summaries."""
 
 from typing import Any, Dict, List, Optional
-from guardianos.ai.vector_store import vector_store
 from guardianos.attackpath.service import attack_path_service
 from guardianos.exposure.service import exposure_service
 from guardianos.intel.feed_data import vuln_registry
@@ -28,7 +27,7 @@ def tool_get_component_lineage(purl_or_name: str) -> Dict[str, Any]:
 
 
 def tool_get_vulnerability_intel(vuln_id: str) -> Dict[str, Any]:
-    """Retrieve authoritative vulnerability details, affected ranges, and fixed versions."""
+    """Retrieve a configured local advisory record, if present."""
     adv = vuln_registry.get_advisory(vuln_id)
     if not adv:
         return {"error": f"Advisory '{vuln_id}' not found in feed registry"}
@@ -36,15 +35,15 @@ def tool_get_vulnerability_intel(vuln_id: str) -> Dict[str, Any]:
 
 
 def tool_get_runtime_exposure(component_name: str) -> Dict[str, Any]:
-    """Determine ingress exposure, authentication posture, and parser usage."""
+    """Retrieve endpoint metadata; this does not inspect runtime ingress."""
     profile = exposure_service.get_component_exposure(component_name)
     if not profile:
-        return {"error": f"No exposure profile mapped to '{component_name}'"}
+        return {"network_exposure": "UNKNOWN", "endpoints": [], "error": f"No exposure profile mapped to '{component_name}'"}
     return profile.model_dump()
 
 
 def tool_get_attack_paths(component_name: str) -> List[Dict[str, Any]]:
-    """Retrieve discovered attack paths reaching cloud storage or target assets."""
+    """Return stored path records; this function does not discover cloud paths."""
     paths = attack_path_service.list_paths()
     matching = [p.model_dump() for p in paths if component_name.lower() in p.name.lower() or component_name in p.vulnerable_component]
     return matching
@@ -62,8 +61,3 @@ def tool_get_patch_propagation(component_name: str) -> Optional[Dict[str, Any]]:
     if records:
         return records[0].model_dump()
     return None
-
-
-def tool_semantic_advisories_search(query: str) -> List[Dict[str, Any]]:
-    """Perform semantic RAG retrieval over security advisories and changelog entries."""
-    return vector_store.search(query=query, limit=3)

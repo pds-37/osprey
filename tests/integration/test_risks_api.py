@@ -20,7 +20,7 @@ def test_risks_api_flow(sample_spdx_json):
         "content": json.loads(sample_spdx_json),
         "application": "image-service",
         "environment": "production",
-        "state": "RUNNING"
+        "state": "UNKNOWN"
     })
 
     # Trigger scan
@@ -34,12 +34,18 @@ def test_risks_api_flow(sample_spdx_json):
 
     libheif_risk = next((r for r in risks if r["component_name"] == "libheif"), None)
     assert libheif_risk is not None
-    assert libheif_risk["risk_level"] == "CRITICAL"
+    assert libheif_risk["risk_level"] == "UNKNOWN"
+    assert libheif_risk["decision"] in {"ACT NOW", "PLAN", "MONITOR", "IGNORE", "UNKNOWN"}
+    assert libheif_risk["composite_score"] is None
     assert len(libheif_risk["reasons"]) >= 3
+    assert any("UNKNOWN" in reason for reason in libheif_risk["reasons"])
+    assert libheif_risk["attack_path_id"] is None
 
     # Summary
     sum_resp = client.get("/api/v1/risks/summary")
     assert sum_resp.status_code == 200
     summary = sum_resp.json()
-    assert summary["critical_count"] >= 1
+    assert summary["critical_count"] == 0
+    assert summary["high_count"] == 0
+    assert summary["unknown_count"] >= 1
     assert summary["total_findings"] >= 1

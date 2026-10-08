@@ -1,11 +1,13 @@
 """Dependency Knowledge Graph API endpoints."""
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from guardianos.api.security import SecuredAPIRouter
+from guardianos.core.security import require_single_organization
 from guardianos.graph.builder import format_graph_for_ui, get_graph_store
 
-router = APIRouter(prefix="/graph", tags=["Knowledge Graph"])
+router = SecuredAPIRouter(prefix="/graph", tags=["Knowledge Graph"], dependencies=[Depends(require_single_organization)])
 
 
 class PathQueryRequest(BaseModel):

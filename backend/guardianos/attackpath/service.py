@@ -15,8 +15,9 @@ class AttackPathService:
     def __init__(self) -> None:
         self.graph = get_graph_store()
 
-    def recalculate_paths(self) -> List[AttackPath]:
-        paths = construct_attack_paths()
+    def recalculate_paths(self, *, include_demo_fixtures: bool = False) -> List[AttackPath]:
+        paths = construct_attack_paths(include_demo_fixtures=include_demo_fixtures)
+        _attack_paths_db.clear()
         for p in paths:
             _attack_paths_db[p.id] = p
 

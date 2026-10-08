@@ -27,10 +27,12 @@ def detect_sbom_format(data: Dict[str, Any]) -> SBOMFormat:
 def parse_sbom(
     raw_content: Union[str, bytes, Dict[str, Any]],
     application: str = "default-app",
-    environment: str = "production",
-    default_state: DependencyState = DependencyState.INSTALLED
+    environment: str = "unknown",
+    default_state: DependencyState = DependencyState.UNKNOWN
 ) -> IngestionResult:
     """Parse any supported SBOM JSON into normalized IngestionResult."""
+    if default_state == DependencyState.RUNNING:
+        raise ValueError("An SBOM cannot establish that a dependency is running")
     if isinstance(raw_content, (str, bytes)):
         data = json.loads(raw_content)
     else:

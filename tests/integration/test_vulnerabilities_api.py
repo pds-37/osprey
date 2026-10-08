@@ -18,7 +18,7 @@ def test_vulnerability_scan_api(sample_spdx_json):
         "content": json.loads(sample_spdx_json),
         "application": "image-processing-service",
         "environment": "production",
-        "state": "RUNNING"
+        "state": "UNKNOWN"
     }
     client.post("/api/v1/sboms/upload", json=upload_payload)
 

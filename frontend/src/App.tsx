@@ -16,6 +16,7 @@ import {
   PatchPropagationRecord,
   RemediationTask,
   SBOMDocument,
+  VulnerabilityFinding,
 } from './types';
 import {
   approveRemediationTask,
@@ -23,16 +24,20 @@ import {
   fetchComponents,
   fetchGraphData,
   fetchHealth,
+  fetchVulnerabilities,
   fetchPatchPropagation,
   fetchRemediationTasks,
   fetchSboms,
   fetchUpstreamChanges,
-  queryAIAnalyst,
+  queryCopilot,
   recalculateAttackPaths,
   runFlagshipDemo,
   clearInventory,
   scanLocalWorkspace,
   verifyRemediationTask,
+  clearAccessToken,
+  getAccessToken,
+  login,
 } from './api';
 import { FolderGit2, Sparkles, RefreshCw, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
@@ -41,7 +46,7 @@ export const App: React.FC = () => {
   const [activeWorkspace, setActiveWorkspace] = useState<MainWorkspace>('threats');
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
-  const [copilotTarget, setCopilotTarget] = useState('libheif');
+  const [copilotFindingId, setCopilotFindingId] = useState('');
   const [selectedComponent, setSelectedComponent] = useState<ComponentItem | null>(null);
 
   // Core Data States
@@ -52,14 +57,21 @@ export const App: React.FC = () => {
   const [propagationRecords, setPropagationRecords] = useState<PatchPropagationRecord[]>([]);
   const [upstreamCommits, setUpstreamCommits] = useState<CommitRecord[]>([]);
   const [remediationTasks, setRemediationTasks] = useState<RemediationTask[]>([]);
-  const [systemStatus, setSystemStatus] = useState('ONLINE · Osprey v2.0');
+  const [findings, setFindings] = useState<VulnerabilityFinding[]>([]);
+  const [systemStatus, setSystemStatus] = useState('API STATUS UNKNOWN');
   const [isScanningWorkspace, setIsScanningWorkspace] = useState(false);
   const [targetPath, setTargetPath] = useState('.');
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [dataLoadWarning, setDataLoadWarning] = useState<string | null>(null);
+  const [apiAuthenticated, setApiAuthenticated] = useState<boolean>(Boolean(getAccessToken()));
+  const [authUsername, setAuthUsername] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
 
 
   const loadAllData = async () => {
+    setDataLoadWarning(null);
     try {
       const [
         health,
@@ -70,15 +82,17 @@ export const App: React.FC = () => {
         patches,
         commits,
         remediations,
+        currentFindings,
       ] = await Promise.all([
-        fetchHealth().catch(() => ({ status: 'healthy', version: '2.0.0' })),
-        fetchComponents().catch(() => []),
-        fetchSboms().catch(() => []),
-        fetchGraphData().catch(() => ({ nodes: [], edges: [], summary: {} })),
-        fetchAttackPaths().catch(() => []),
-        fetchPatchPropagation().catch(() => []),
-        fetchUpstreamChanges().catch(() => []),
-        fetchRemediationTasks().catch(() => []),
+        fetchHealth().catch(() => ({ status: 'unavailable', version: 'unknown' })),
+        fetchComponents().catch(() => { setDataLoadWarning('Some protected data could not be loaded. Sign in or check your API permissions; empty results may be unavailable rather than empty.'); return []; }),
+        fetchSboms().catch(() => { setDataLoadWarning('Some protected data could not be loaded. Sign in or check your API permissions; empty results may be unavailable rather than empty.'); return []; }),
+        fetchGraphData().catch(() => { setDataLoadWarning('Some protected data could not be loaded. Sign in or check your API permissions; empty results may be unavailable rather than empty.'); return { nodes: [], edges: [], summary: {} }; }),
+        fetchAttackPaths().catch(() => { setDataLoadWarning('Some protected data could not be loaded. Sign in or check your API permissions; empty results may be unavailable rather than empty.'); return []; }),
+        fetchPatchPropagation().catch(() => { setDataLoadWarning('Some protected data could not be loaded. Sign in or check your API permissions; empty results may be unavailable rather than empty.'); return []; }),
+        fetchUpstreamChanges().catch(() => { setDataLoadWarning('Some protected data could not be loaded. Sign in or check your API permissions; empty results may be unavailable rather than empty.'); return []; }),
+        fetchRemediationTasks().catch(() => { setDataLoadWarning('Some protected data could not be loaded. Sign in or check your API permissions; empty results may be unavailable rather than empty.'); return []; }),
+        fetchVulnerabilities().catch(() => { setDataLoadWarning('Some protected data could not be loaded. Sign in or check your API permissions; empty results may be unavailable rather than empty.'); return []; }),
       ]);
 
       setSystemStatus(`${health.status.toUpperCase()} · v${health.version}`);
@@ -89,6 +103,7 @@ export const App: React.FC = () => {
       setPropagationRecords(patches);
       setUpstreamCommits(commits);
       setRemediationTasks(remediations);
+      setFindings(currentFindings);
     } catch (e) {
       console.error('Error fetching dashboard data:', e);
     }
@@ -98,17 +113,27 @@ export const App: React.FC = () => {
     loadAllData();
   }, []);
 
-  // Global Keyboard Shortcut: Cmd+K / Ctrl+K opens Copilot
+  const handleToggleCopilot = () => {
+    setIsCopilotOpen((prev) => {
+      const next = !prev;
+      if (next && (!copilotFindingId || copilotFindingId === 'package')) {
+        setCopilotFindingId(findings[0]?.id || '');
+      }
+      return next;
+    });
+  };
+
+  // Global Keyboard Shortcut: Cmd+K / Ctrl+K opens the evidence summary
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setIsCopilotOpen((prev) => !prev);
+        handleToggleCopilot();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [attackPaths, components, copilotFindingId, findings]);
 
   // Action Handlers
   const handleRunDemo = async () => {
@@ -122,8 +147,8 @@ export const App: React.FC = () => {
     await loadAllData();
   };
 
-  const handleApproveTask = async (taskId: string, actor: string) => {
-    await approveRemediationTask(taskId, actor);
+  const handleApproveTask = async (taskId: string) => {
+    await approveRemediationTask(taskId);
     await loadAllData();
   };
 
@@ -132,23 +157,49 @@ export const App: React.FC = () => {
     await loadAllData();
   };
 
-  const handleOpenCopilot = (componentName: string) => {
-    setCopilotTarget(componentName);
+  const handleApiLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuthError(null);
+    try {
+      await login(authUsername, authPassword);
+      setApiAuthenticated(true);
+      setAuthPassword('');
+      await loadAllData();
+    } catch (error: any) {
+      setAuthError(error.message || 'Sign-in failed');
+    }
+  };
+
+  const handleApiLogout = () => {
+    clearAccessToken();
+    setApiAuthenticated(false);
+    setComponents([]);
+    setSboms([]);
+    setGraphData(null);
+    setAttackPaths([]);
+    setPropagationRecords([]);
+    setUpstreamCommits([]);
+    setRemediationTasks([]);
+    setFindings([]);
+    setSelectedComponent(null);
+    setCopilotFindingId('');
+    setIsCopilotOpen(false);
+    setDataLoadWarning('Sign in to load organization-scoped inventory and findings.');
+  };
+
+  const handleOpenCopilot = (findingId: string) => {
+    setCopilotFindingId(findingId);
     setIsCopilotOpen(true);
   };
 
   const hasOpenThreats = attackPaths.some((p) => p.status === 'OPEN');
-  const pendingPRsCount = remediationTasks.filter((t) => t.status === 'PENDING_APPROVAL').length;
+  const pendingRecommendationsCount = remediationTasks.filter((t) => t.status === 'PENDING_APPROVAL').length;
 
   // Render Public Landing Page
   if (isLanding) {
     return (
       <LandingPage
         onEnterApp={() => setIsLanding(false)}
-        onRunDemoAndEnter={async () => {
-          setIsLanding(false);
-          await handleRunDemo();
-        }}
       />
     );
   }
@@ -161,15 +212,35 @@ export const App: React.FC = () => {
         activeWorkspace={activeWorkspace}
         setActiveWorkspace={setActiveWorkspace}
         onOpenUpload={() => setIsUploadOpen(true)}
-        onToggleCopilot={() => setIsCopilotOpen((prev) => !prev)}
+        onToggleCopilot={handleToggleCopilot}
         onGoToLanding={() => setIsLanding(true)}
         systemStatus={systemStatus}
         hasOpenThreats={hasOpenThreats}
-        pendingPRsCount={pendingPRsCount}
+        pendingPRsCount={pendingRecommendationsCount}
       />
 
       {/* 2. Workspace Project Target Extension Bar */}
       <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-0 space-y-2">
+        {attackPaths.some((path) => path.fixture) && (
+          <div role="status" className="p-3 rounded-xl border border-amber-900/60 bg-amber-950/20 text-xs text-amber-200">
+            <strong>DEMO FIXTURE DATA LOADED.</strong> Some inventory, vulnerability, path, lifecycle, risk, and remediation values shown in the dashboard are synthetic examples, not observations about your application or environment.
+          </div>
+        )}
+        {!apiAuthenticated ? (
+          <form onSubmit={handleApiLogin} className="p-3 bg-neutral-950 border border-neutral-900 rounded-xl flex flex-col sm:flex-row sm:items-center gap-2">
+            <span className="text-xs text-neutral-300">Sign in to access protected API actions.</span>
+            <input aria-label="Username" autoComplete="username" value={authUsername} onChange={(event) => setAuthUsername(event.target.value)} placeholder="Username" className="px-2.5 py-1.5 rounded-md bg-black border border-neutral-800 text-xs text-white" />
+            <input aria-label="Password" autoComplete="current-password" type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="Password" className="px-2.5 py-1.5 rounded-md bg-black border border-neutral-800 text-xs text-white" />
+            <button type="submit" className="px-3 py-1.5 rounded-md text-xs font-semibold bg-white text-black">Sign in</button>
+            {authError && <span role="alert" className="text-xs text-rose-400">{authError}</span>}
+          </form>
+        ) : (
+          <div className="flex justify-end items-center gap-2 text-[11px] text-neutral-500">
+            <span>Authenticated API session</span>
+            <button onClick={handleApiLogout} className="text-neutral-300 hover:text-white">Sign out</button>
+          </div>
+        )}
+        {dataLoadWarning && <div role="status" className="p-3 rounded-xl border border-amber-900/60 bg-amber-950/20 text-xs text-amber-200">{dataLoadWarning}</div>}
         <div className="p-3 bg-neutral-950 border border-neutral-900 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5 flex-1">
             <div className="w-6 h-6 rounded bg-neutral-900 border border-neutral-800 flex items-center justify-center text-white shrink-0">
@@ -226,7 +297,7 @@ export const App: React.FC = () => {
                 try {
                   const res = await scanLocalWorkspace(targetPath, undefined, true);
                   const manifestList = res.summary?.manifests?.join(', ') || 'manifests';
-                  setScanFeedback(`Indexed ${res.components_count} packages (${manifestList}) · Demo cleared`);
+                  setScanFeedback(`Indexed ${res.components_count} packages (${manifestList}) · Previous inventory cleared`);
                   await loadAllData();
                 } catch (e: any) {
                   setScanError(e.message || 'Scan failed');
@@ -250,13 +321,20 @@ export const App: React.FC = () => {
             </button>
 
             <button
-              title="Clear all components and vulnerabilities from memory"
+              title="Clear the current inventory and related analysis records (preserves independently stored endpoint and upstream inputs)"
               onClick={async () => {
                 try {
                   await clearInventory();
-                  setScanFeedback('Inventory and vulnerabilities cleared. Workspace ready for new scan.');
+                  setComponents([]);
+                  setSboms([]);
+                  setGraphData({ nodes: [], edges: [], summary: {} });
+                  setAttackPaths([]);
+                  setPropagationRecords([]);
+                  setUpstreamCommits([]);
+                  setRemediationTasks([]);
+                  setSelectedComponent(null);
+                  setScanFeedback('Inventory and related analysis records cleared. Target path and independently stored endpoint/upstream inputs are preserved.');
                   setScanError(null);
-                  await loadAllData();
                 } catch (e: any) {
                   setScanError(`Failed to clear: ${e.message}`);
                 }
@@ -320,6 +398,7 @@ export const App: React.FC = () => {
             attackPaths={attackPaths}
             propagationRecords={propagationRecords}
             upstreamCommits={upstreamCommits}
+            findings={findings}
             onOpenAI={handleOpenCopilot}
             onGoToRemediation={() => setActiveWorkspace('remediation')}
             onRunDemo={handleRunDemo}
@@ -347,12 +426,12 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* 3. Slide-Over AI Copilot Drawer (Cmd+K) */}
+      {/* 3. Read-only, evidence-grounded copilot (Cmd+K) */}
       <AiCopilotDrawer
         isOpen={isCopilotOpen}
         onClose={() => setIsCopilotOpen(false)}
-        targetComponent={copilotTarget}
-        onQuery={queryAIAnalyst}
+        findingId={copilotFindingId}
+        onQuery={queryCopilot}
       />
 
       {/* 4. Ingest SBOM Modal */}

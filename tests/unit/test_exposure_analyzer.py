@@ -39,8 +39,8 @@ def test_high_exposure_for_internet_facing_parser():
     assert profile.exposure_rating in [ExposureRating.CRITICAL_EXPOSURE, ExposureRating.HIGH_EXPOSURE]
     assert profile.network_exposure == NetworkExposure.INTERNET_FACING
     assert profile.auth_requirement == AuthRequirement.NONE
-    assert any("Internet-facing" in r for r in profile.reasons)
-    assert any("Untrusted Input Parser" in r for r in profile.reasons)
+    assert any("Configured endpoint metadata labels" in r for r in profile.reasons)
+    assert any("untrusted-input parser processing" in r for r in profile.reasons)
 
 
 def test_low_exposure_for_internal_isolated_component():
@@ -57,5 +57,5 @@ def test_low_exposure_for_internal_isolated_component():
 
     profile = evaluate_component_exposure(comp, [])
 
-    assert profile.exposure_rating in [ExposureRating.LOW_EXPOSURE, ExposureRating.MINIMAL_EXPOSURE]
-    assert profile.network_exposure == NetworkExposure.LOCALHOST_ONLY
+    assert profile.exposure_rating == ExposureRating.UNKNOWN
+    assert profile.network_exposure == NetworkExposure.UNKNOWN

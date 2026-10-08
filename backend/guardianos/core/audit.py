@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 from pydantic import BaseModel, Field
+from guardianos.storage.sqlite import state_store
 
 logger = logging.getLogger("guardianos.audit")
 
@@ -18,10 +19,6 @@ class AuditEvent(BaseModel):
     details: dict[str, Any] = Field(default_factory=dict)
     ip_address: Optional[str] = None
     status: str = "SUCCESS"
-
-
-# In-memory transient audit store (synced to DB in db layer)
-_audit_log_buffer: list[AuditEvent] = []
 
 
 def record_audit_event(
@@ -45,10 +42,15 @@ def record_audit_event(
         ip_address=ip_address,
         status=status
     )
-    _audit_log_buffer.append(event)
+    state_store.append_audit_event(event)
     logger.info(f"AUDIT: [{event.action}] by {event.actor} on {event.target_type}:{event.target_id} - status={event.status}")
     return event
 
 
 def get_recent_audit_events(limit: int = 100) -> list[AuditEvent]:
-    return sorted(_audit_log_buffer, key=lambda e: e.timestamp, reverse=True)[:limit]
+    return [AuditEvent.model_validate(item) for item in state_store.recent_audit_events(limit)]
+
+
+def clear_audit_events() -> None:
+    """Clear audit events for an explicit administrative/test reset."""
+    state_store.clear_audit_events()

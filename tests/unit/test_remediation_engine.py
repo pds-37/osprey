@@ -1,6 +1,5 @@
 """Unit tests for Remediation Engine, PR generation, and Verification closure."""
 
-from guardianos.attackpath.models import AttackPathStatus
 from guardianos.attackpath.service import attack_path_service
 from guardianos.intel.models import VulnerabilityFinding, VulnerabilitySeverity
 from guardianos.intel.service import intel_service
@@ -22,7 +21,7 @@ def test_remediation_lifecycle_and_verification():
     inventory_service.ingest_sbom(
         raw_content='{"bomFormat": "CycloneDX", "specVersion": "1.4", "components": [{"name": "libheif", "version": "1.19.7", "purl": "pkg:deb/debian/libheif@1.19.7"}]}',
         application="image-service",
-        default_state=DependencyState.RUNNING
+        default_state=DependencyState.UNKNOWN
     )
     comp = inventory_service.get_component("pkg:deb/debian/libheif@1.19.7")
     assert comp is not None
@@ -30,9 +29,8 @@ def test_remediation_lifecycle_and_verification():
     intel_service.scan_all_components()
 
     paths = attack_path_service.recalculate_paths()
-    assert len(paths) >= 1
-    path = paths[0]
-    assert path.status == AttackPathStatus.OPEN
+    assert paths == []
+    path = None
 
     finding = intel_service.list_findings()[0]
 
@@ -41,8 +39,9 @@ def test_remediation_lifecycle_and_verification():
     assert task.status == RemediationStatus.PENDING_APPROVAL
     assert task.component_name == "libheif"
     assert task.target_version == "1.19.8"
-    assert "Dockerfile" in task.pull_request.target_file
-    assert "+    libheif=1.19.8" in task.pull_request.diff_content
+    assert task.pull_request.target_file is None
+    assert task.pull_request.diff_content is None
+    assert "did not edit a repository" in task.pull_request.body
 
     # 3. Simulate human approval
     task.status = RemediationStatus.APPROVED
@@ -51,12 +50,35 @@ def test_remediation_lifecycle_and_verification():
     # 4. Trigger verification closure
     evidence = verify_remediation_closure(task)
 
-    assert task.status == RemediationStatus.VERIFIED_CLOSED
-    assert evidence["attack_path_status"] == "CLOSED"
-    assert evidence["vulnerability_status"] == "RESOLVED"
-    assert evidence["message"] == "Remediation verified. Attack path CLOSED."
-    
-    # Query path from service
-    updated_path = attack_path_service.get_path(path.id)
-    assert updated_path is not None
-    assert updated_path.status == AttackPathStatus.CLOSED
+    assert task.status == RemediationStatus.UNVERIFIED
+    assert evidence["attack_path_status"] == "NOT_OBSERVED"
+    assert evidence["vulnerability_status"] == "UNKNOWN"
+    assert "Upload a fresh SBOM" in evidence["message"]
+    assert inventory_service.get_component("pkg:deb/debian/libheif@1.19.7") is not None
+
+
+def test_fixed_version_in_inventory_does_not_claim_deployment_verified():
+    inventory_service.clear()
+    intel_service.clear()
+    remediation_service.clear()
+
+    inventory_service.ingest_sbom(
+        raw_content='{"bomFormat":"CycloneDX","specVersion":"1.4","components":[{"name":"libheif","version":"1.19.7","purl":"pkg:deb/debian/libheif@1.19.7"}]}',
+        application="image-service",
+    )
+    intel_service.scan_all_components()
+    finding = intel_service.list_findings()[0]
+    vulnerable = inventory_service.get_component(finding.component_purl)
+    task = generate_remediation_task(finding, vulnerable)
+
+    inventory_service.ingest_sbom(
+        raw_content='{"bomFormat":"CycloneDX","specVersion":"1.4","components":[{"name":"libheif","version":"1.19.8","purl":"pkg:deb/debian/libheif@1.19.8"}]}',
+        application="image-service",
+        default_state=DependencyState.INSTALLED,
+    )
+    evidence = verify_remediation_closure(task)
+
+    assert task.status == RemediationStatus.UNVERIFIED
+    assert evidence["remediation_status"] == "RESOLVED_FOR_OBSERVED_COMPONENT"
+    assert evidence["verification_scope"] == "inventory observation only"
+    assert evidence["attack_path_status"] == "NOT_OBSERVED"

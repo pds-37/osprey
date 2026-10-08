@@ -20,7 +20,7 @@ def test_attack_path_api_flow(sample_spdx_json):
         "content": json.loads(sample_spdx_json),
         "application": "image-service",
         "environment": "production",
-        "state": "RUNNING"
+        "state": "UNKNOWN"
     })
 
     # 2. Trigger scan
@@ -30,14 +30,6 @@ def test_attack_path_api_flow(sample_spdx_json):
     resp = client.post("/api/v1/attack-paths/recalculate")
     assert resp.status_code == 200
     paths = resp.json()
-    assert len(paths) >= 1
-
-    libheif_path = next((p for p in paths if "libheif" in p["name"]), None)
-    assert libheif_path is not None
-    assert libheif_path["target_resource"] == "s3://customer-media-production"
-    assert libheif_path["status"] == "OPEN"
-
-    # 4. Get detail
-    detail_resp = client.get(f"/api/v1/attack-paths/{libheif_path['id']}")
-    assert detail_resp.status_code == 200
-    assert len(detail_resp.json()["step_edges"]) == 6
+    # An SBOM alone provides no route, function, or cloud evidence. The API
+    # must not invent a path from the package to a cloud resource.
+    assert paths == []

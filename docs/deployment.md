@@ -1,37 +1,57 @@
-# GuardianOS v2 — Deployment Guide
+# Local Development and Deployment Notes
 
-GuardianOS supports both local native development and full containerized Docker Compose deployments.
+Osprey currently supports local development and single-instance use. The Compose setup runs the API with SQLite persistence and serves the static UI through Nginx, which proxies API requests to the backend. It binds host ports to loopback and requires configured authentication secrets. This is a local single-instance setup, not a production-hardened deployment.
 
-## 1. Native Development Mode (No External Daemons Required)
-GuardianOS is engineered with self-contained in-memory fallback capabilities (NetworkX Graph Store and SQLite persistence):
+## Docker Compose
 
-```bash
-# 1. Run tests
-python run_tests.py
+Set `SECRET_KEY` (at least 32 bytes) and `AUTH_USERS_JSON` in an untracked local `.env` file, then run:
 
-# 2. Start Backend API
-uvicorn guardianos.api.app:app --host 0.0.0.0 --port 8000 --reload
+```sh
+docker compose up --build
+```
 
-# 3. Start Frontend Dashboard
+Open `http://127.0.0.1:8080`. API documentation is available at `http://127.0.0.1:8000/api/docs`. State is kept in the `osprey_state` Docker volume. PostgreSQL, Redis, and Neo4j are not started because the current backend does not use them. Compose does not mount a host project directory for workspace scanning; upload an SBOM or run the CLI directly against a local project.
+
+## Backend
+
+From the repository root:
+
+```powershell
+python -m pip install -r .\backend\requirements.txt
+cd backend
+python -m uvicorn guardianos.api.app:app --host 127.0.0.1 --port 8000
+```
+
+Set these environment variables before starting:
+
+- `SECRET_KEY`: at least 32 bytes; required at production application startup.
+- `AUTH_USERS_JSON`: JSON map of configured usernames to PBKDF2-SHA256 password hashes and roles.
+- `STATE_DB_PATH`: SQLite file path; defaults to `./osprey-state.sqlite3`.
+- `WORKSPACE_ROOT`: optional root allowed for local manifest scans; defaults to the backend process working directory.
+- `ENABLE_DEMO_FIXTURES`: keep false unless running the explicitly simulated demo.
+
+The SQLite file may contain inventory metadata, findings, evidence metadata/hashes, endpoint assertions, remediation proposals, upstream inputs, and audit events. Protect it as application data and back it up using normal SQLite-safe procedures. The NetworkX graph is in-memory and is rebuilt from stored inventory on startup.
+
+## Frontend
+
+```powershell
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173` in your browser.
+For build validation, run `npm run build`. The project has no automated frontend test suite.
 
----
+## CLI
 
-## 2. Production Multi-Container Deployment (Docker Compose)
-For enterprise production environments with PostgreSQL and Neo4j:
-
-```bash
-docker compose up -d --build
+```powershell
+python -m pip install -e .\osprey
+osprey scan .
+osprey scan . --offline
 ```
 
-### Services Deployed
-- **backend**: FastAPI service on port 8000
-- **frontend**: React Vite production build on port 80
-- **postgres**: PostgreSQL 16 on port 5432
-- **neo4j**: Neo4j Graph Database on ports 7474 and 7687
-- **redis**: Redis 7.2 on port 6379
+The scanner reads supported files and never executes target code. Review the scan root and network settings before scanning untrusted repositories.
+
+## Production readiness gaps
+
+This repository is not a production-hardened multi-tenant service. It has no OIDC integration, rate limiting, multi-process SQLite deployment design, database migrations, durable graph adapter, external audit sink, runtime/cloud collectors, or complete frontend security test suite. Use a reverse proxy, private network, least-privilege filesystem mounts, managed secrets, and an external identity provider before exposing a deployment; those controls are not supplied by this project today.

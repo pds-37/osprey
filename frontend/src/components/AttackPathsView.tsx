@@ -18,7 +18,7 @@ export const AttackPathsView: React.FC<AttackPathsViewProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold text-white tracking-tight">Active Adversary Attack Paths</h2>
-          <p className="text-xs text-neutral-400">Deterministic graph traversals from external ingress to cloud infrastructure</p>
+          <p className="text-xs text-neutral-400">Only evidence-backed paths belong here. No path evidence is not proof of isolation.</p>
         </div>
         <button
           onClick={onRecalculate}

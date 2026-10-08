@@ -1,0 +1,62 @@
+name: 'Osprey Dependency Vulnerability Scan'
+description: 'Fast, opinionated supply chain vulnerability scan with exposure inference and deterministic risk triage'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  path:
+    description: 'Target directory to scan'
+    required: false
+    default: '.'
+  sarif-file:
+    description: 'Path to output SARIF report'
+    required: false
+    default: 'osprey-results.sarif'
+  sbom-file:
+    description: 'Path to output CycloneDX SBOM'
+    required: false
+    default: ''
+  fail-on:
+    description: 'Exit with non-zero code on findings at or above tier (act-now or plan)'
+    required: false
+    default: ''
+  offline:
+    description: 'Run in offline mode'
+    required: false
+    default: 'false'
+
+outputs:
+  sarif-file:
+    description: 'Generated SARIF report file path'
+    value: ${{ inputs.sarif-file }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install Osprey
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install osprey-sc
+
+    - name: Run Osprey Scan
+      shell: bash
+      run: |
+        CMD="osprey scan ${{ inputs.path }} --sarif ${{ inputs.sarif-file }}"
+        if [ -n "${{ inputs.sbom-file }}" ]; then
+          CMD="$CMD --sbom ${{ inputs.sbom-file }}"
+        fi
+        if [ -n "${{ inputs.fail-on }}" ]; then
+          CMD="$CMD --fail-on ${{ inputs.fail-on }}"
+        fi
+        if [ "${{ inputs.offline }}" = "true" ]; then
+          CMD="$CMD --offline"
+        fi
+        echo "Executing: $CMD"
+        eval "$CMD"

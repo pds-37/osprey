@@ -10,7 +10,7 @@ from guardianos.exposure.models import (
     ExposureRating,
     NetworkExposure,
 )
-from guardianos.inventory.models import Component, DependencyState
+from guardianos.inventory.models import Component
 
 
 def evaluate_component_exposure(
@@ -28,49 +28,47 @@ def evaluate_component_exposure(
     unauthenticated = any(ep.auth_requirement == AuthRequirement.NONE for ep in matching_endpoints)
     parser_role = any(ep.processing_type == DataProcessingType.PARSER_UNTRUSTED_INPUT for ep in matching_endpoints)
     
-    is_prod = (component.environment.lower() == "production")
-    is_running = (component.state == DependencyState.RUNNING)
 
     # 1. Network Exposure
     if has_internet:
         score += 40
-        reasons.append("Internet-facing: Endpoint is publicly accessible from the external Internet.")
+        reasons.append("Configured endpoint metadata labels at least one connected endpoint INTERNET_FACING.")
         network_exp = NetworkExposure.INTERNET_FACING
-    elif matching_endpoints:
+    elif matching_endpoints and all(ep.network_exposure != NetworkExposure.UNKNOWN for ep in matching_endpoints):
         score += 20
-        reasons.append("Internal network: Endpoint reachable within the internal VPC.")
+        reasons.append("Configured endpoint metadata reports non-public network exposure.")
         network_exp = NetworkExposure.INTERNAL_NETWORK
+    elif matching_endpoints:
+        network_exp = NetworkExposure.UNKNOWN
+        reasons.append("UNKNOWN: endpoint network exposure is incomplete.")
     else:
-        network_exp = NetworkExposure.LOCALHOST_ONLY
-        reasons.append("Local/Internal only: Component is not bound to public listening routes.")
+        network_exp = NetworkExposure.UNKNOWN
+        reasons.append("NOT OBSERVED: no endpoint observation is connected to this component.")
 
     # 2. Authentication Requirement
     if unauthenticated and has_internet:
         score += 30
-        reasons.append("Unauthenticated: Route accepts requests without authentication tokens or sessions.")
+        reasons.append("Configured endpoint metadata reports no authentication requirement.")
         auth_req = AuthRequirement.NONE
     elif unauthenticated:
         score += 15
         auth_req = AuthRequirement.NONE
-    else:
+    elif matching_endpoints and all(ep.auth_requirement != AuthRequirement.UNKNOWN for ep in matching_endpoints):
         auth_req = AuthRequirement.REQUIRED
-        reasons.append("Authentication required: Ingress requests must present authenticated identity credentials.")
+        reasons.append("Configured endpoint metadata indicates authentication is required.")
+    else:
+        auth_req = AuthRequirement.UNKNOWN
+        reasons.append("NOT OBSERVED: endpoint authentication requirements are unavailable.")
 
     # 3. Parser / Untrusted Input
     if parser_role:
         score += 20
-        reasons.append("Untrusted Input Parser: Component actively parses attacker-supplied binary image/file payloads.")
+        reasons.append("Configured endpoint metadata identifies untrusted-input parser processing.")
         proc_type = DataProcessingType.PARSER_UNTRUSTED_INPUT
+    elif matching_endpoints and len({ep.processing_type for ep in matching_endpoints}) == 1:
+        proc_type = matching_endpoints[0].processing_type
     else:
-        proc_type = DataProcessingType.BUSINESS_LOGIC
-
-    # 4. Environment & Runtime State
-    if is_prod and is_running:
-        score += 15
-        reasons.append("Active Production Workload: Component is executing in live production containers.")
-    elif is_prod:
-        score += 10
-        reasons.append("Production image: Component is packaged into production container images.")
+        proc_type = DataProcessingType.UNKNOWN
 
     # Classify exposure rating
     if score >= 85:
@@ -81,6 +79,8 @@ def evaluate_component_exposure(
         rating = ExposureRating.MEDIUM_EXPOSURE
     elif score >= 15:
         rating = ExposureRating.LOW_EXPOSURE
+    elif not matching_endpoints:
+        rating = ExposureRating.UNKNOWN
     else:
         rating = ExposureRating.MINIMAL_EXPOSURE
 
@@ -92,9 +92,9 @@ def evaluate_component_exposure(
         network_exposure=network_exp,
         auth_requirement=auth_req,
         processing_type=proc_type,
-        asset_criticality=AssetCriticality.TIER_1_HIGH if is_prod else AssetCriticality.TIER_2_MEDIUM,
-        is_privileged_runtime=False,
-        agent_accessible=True,
+        asset_criticality=AssetCriticality.UNKNOWN,
+        is_privileged_runtime=None,
+        agent_accessible=None,
         exposure_rating=rating,
         reasons=reasons,
         endpoints=matching_endpoints

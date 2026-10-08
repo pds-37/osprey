@@ -1,16 +1,18 @@
 """Contextual Risk API endpoints."""
 
 from typing import List, Optional
-from fastapi import APIRouter, Query, status
+from fastapi import Depends, Query, status
 from guardianos.risk.models import ContextualRiskScore
 from guardianos.risk.service import risk_service
+from guardianos.api.security import SecuredAPIRouter
+from guardianos.core.security import require_single_organization
 
-router = APIRouter(prefix="/risks", tags=["Contextual Risk"])
+router = SecuredAPIRouter(prefix="/risks", tags=["Contextual Risk"], dependencies=[Depends(require_single_organization)])
 
 
 @router.get("", response_model=List[ContextualRiskScore])
 async def list_risks(
-    level: Optional[str] = Query(None, description="Filter by risk level (CRITICAL, HIGH, MEDIUM, LOW)")
+    level: Optional[str] = Query(None, description="Filter by risk level (UNKNOWN, CRITICAL, HIGH, MEDIUM, LOW)")
 ):
     """Retrieve prioritized contextual risk findings with transparent explainability."""
     return risk_service.list_risks(level=level)

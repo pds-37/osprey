@@ -6,6 +6,7 @@ import {
   GitPullRequest,
   Sparkles,
   Flame,
+  Github,
 } from 'lucide-react';
 
 export type MainWorkspace = 'threats' | 'supply-chain' | 'remediation';
@@ -99,22 +100,33 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </nav>
 
-          {/* Right Actions: Status, Copilot & Ingest */}
-          <div className="flex items-center space-x-2.5 shrink-0">
+          {/* Right Actions: Status, Evidence Summary & Ingest */}
+          <div className="flex items-center space-x-2 shrink-0">
+            {/* GitHub Repository Link */}
+            <a
+              href="https://github.com/pds-37/osprey"
+              target="_blank"
+              rel="noreferrer"
+              title="View Osprey on GitHub (pds-37/osprey)"
+              className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-900 hover:border-neutral-800 transition-colors flex items-center"
+            >
+              <Github className="w-4 h-4" />
+            </a>
+
             {/* System Status */}
             <div className="hidden md:flex items-center space-x-1.5 text-[10px] font-mono px-2 py-1 rounded bg-neutral-950 border border-neutral-900 text-neutral-400">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
               <span>{systemStatus}</span>
             </div>
 
-            {/* AI Copilot Drawer Trigger */}
+            {/* Evidence summary drawer trigger */}
             <button
               onClick={onToggleCopilot}
               className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-800 transition-all"
-              title="Open AI Security Copilot (Cmd+K)"
+              title="Open Osprey Summary (Cmd+K)"
             >
               <Sparkles className="w-3.5 h-3.5 text-neutral-300" />
-              <span>Copilot</span>
+              <span>Summary</span>
               <kbd className="hidden sm:inline-block px-1 py-0.5 rounded text-[9px] font-mono bg-black text-neutral-400 border border-neutral-850">
                 ⌘K
               </kbd>
